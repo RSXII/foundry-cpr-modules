@@ -1,0 +1,88 @@
+/* Matches cyberpunk-red-vehicles/styles/vehicle-sheet.css's own section/
+   item-row conventions and CSS variables so the injected crew section
+   doesn't look bolted on. */
+
+.vehicle-crew {
+  margin-top: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--cpr-background-border, #b90202);
+}
+
+.vehicle-crew .items-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.35rem;
+}
+
+.vehicle-crew .items-header h3 {
+  margin: 0;
+  font-family: var(--cpr-font-hero, "Rubik", sans-serif);
+}
+
+.vehicle-crew .crew-add-seat {
+  width: auto;
+  line-height: 1.4;
+  padding: 0.1rem 0.5rem;
+}
+
+.crew-seat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.crew-seat {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.25rem 0.4rem;
+  background-color: var(--cpr-background-box, #eaeaea);
+  border: 1px solid var(--cpr-background-border, #b90202);
+}
+
+.crew-seat.dragover {
+  outline: 2px dashed var(--cpr-background-border, #b90202);
+}
+
+.crew-seat-label {
+  font-weight: bold;
+  min-width: 6rem;
+}
+
+.crew-occupant {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex: 1;
+}
+
+.crew-occupant-img {
+  width: 24px;
+  height: 24px;
+  object-fit: cover;
+  border: none;
+}
+
+.crew-occupant-name {
+  flex: 1;
+}
+
+.crew-access {
+  background-color: var(--cpr-background-box, #eaeaea);
+  border: 1px solid var(--cpr-background-border, #b90202);
+  color: var(--cpr-text-normal, #222);
+  font-family: var(--cpr-font-primary, "Jost", sans-serif);
+  font-size: var(--cpr-font-small, 0.9rem);
+}
+
+.crew-assign,
+.crew-empty {
+  flex: 1;
+  font-size: var(--cpr-font-small, 0.9rem);
+  color: var(--cpr-text-normal, #222);
+}
+
+.crew-assign {
+  cursor: pointer;
+}

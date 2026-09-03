@@ -1,0 +1,50 @@
+.cpr-terminal-app .window-content {
+  padding: 0;
+  overflow: hidden;
+  background: #000;
+}
+
+.cpr-terminal-iframe {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+.cpr-terminal-send-location-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.5rem;
+}
+
+.cpr-terminal-send-location-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-weight: 600;
+}
+
+.cpr-terminal-send-location-hint {
+  font-weight: normal;
+  font-size: 0.8em;
+  opacity: 0.7;
+}
+
+.cpr-terminal-send-location-error {
+  opacity: 0.8;
+}
+
+.cpr-terminal-send-location-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.cpr-terminal-send-location-btn {
+  flex: 1;
+}
+
+.cpr-terminal-send-location-btn-clear {
+  opacity: 0.75;
+}

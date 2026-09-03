@@ -1,0 +1,34 @@
+<form class="cpr-terminal-send-location-form">
+  {{#if loadError}}
+    <p class="cpr-terminal-send-location-error">
+      Couldn't reach the shared database: {{loadError}}
+    </p>
+  {{else}}
+    <label>
+      District
+      <select name="districtId">
+        <option value="">— choose a district —</option>
+        {{#each districts as |d|}}
+          <option value="{{d.id}}">{{{d.name}}}</option>
+        {{/each}}
+      </select>
+    </label>
+    <label>
+      Location
+      <span class="cpr-terminal-send-location-hint">optional — leave blank to send the whole district</span>
+      <select name="locationId">
+        <option value="">— district only —</option>
+        {{#each locations as |l|}}
+          <option value="{{l.id}}" data-district="{{l.districtId}}">{{{l.name}}}</option>
+        {{/each}}
+      </select>
+    </label>
+    <div class="cpr-terminal-send-location-actions">
+      <button type="button" data-action="send" class="cpr-terminal-send-location-btn">Send Location</button>
+      <button type="button" data-action="clear" class="cpr-terminal-send-location-btn cpr-terminal-send-location-btn-clear">Clear Location</button>
+    </div>
+    <p class="cpr-terminal-send-location-hint">
+      Clear once the "en route" moment has passed — otherwise every terminal that opens or reloads keeps replaying it.
+    </p>
+  {{/if}}
+</form>

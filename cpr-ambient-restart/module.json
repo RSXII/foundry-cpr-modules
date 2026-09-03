@@ -1,0 +1,18 @@
+{
+  "id": "cpr-ambient-restart",
+  "title": "CPR Ambient Restart",
+  "description": "Lets a GM flag an Ambient Sound to always restart from the beginning on scene load (or on demand), instead of resuming wherever Foundry's shared background playback happened to be.",
+  "version": "0.1.0",
+  "compatibility": {
+    "minimum": "12",
+    "verified": "13"
+  },
+  "authors": [
+    {
+      "name": "Ryan Schultz"
+    }
+  ],
+  "esmodules": [
+    "scripts/main.js"
+  ]
+}

@@ -1,0 +1,50 @@
+<section class="vehicle-crew">
+  <div class="items-header">
+    <h3>Crew</h3>
+    {{#if editable}}
+      <button type="button" class="crew-add-seat"><i class="fas fa-plus"></i> Add Seat</button>
+    {{/if}}
+  </div>
+
+  {{#if hasSeats}}
+    <div class="crew-seat-list">
+      {{#each seats}}
+        <div class="crew-seat drop-zone" data-seat-id="{{id}}">
+          <div class="crew-seat-label">{{label}}</div>
+
+          {{#if occupant}}
+            <div class="crew-occupant">
+              <img class="crew-occupant-img" src="{{occupant.img}}" alt="{{occupant.name}}" />
+              <span class="crew-occupant-name">{{occupant.name}}</span>
+              {{#if ../editable}}
+                <select class="crew-access" data-seat-id="{{id}}">
+                  <option value="none" {{#if occupant.accessNone}}selected{{/if}}>No Access</option>
+                  <option value="observer" {{#if occupant.accessObserver}}selected{{/if}}>Observer</option>
+                  <option value="owner" {{#if occupant.accessOwner}}selected{{/if}}>Owner</option>
+                </select>
+                <a class="crew-remove-occupant" data-seat-id="{{id}}" title="Remove from seat">
+                  <i class="fas fa-sign-out-alt"></i>
+                </a>
+              {{/if}}
+            </div>
+          {{else}}
+            {{#if ../editable}}
+              <a class="crew-assign" data-seat-id="{{id}}" title="Assign the currently-selected token">
+                <i class="fas fa-user-plus"></i> Assign selected token
+              </a>
+            {{else}}
+              <span class="crew-empty">Empty</span>
+            {{/if}}
+          {{/if}}
+
+          {{#if ../editable}}
+            <a class="crew-edit-seat" data-seat-id="{{id}}" title="Edit seat"><i class="fas fa-edit"></i></a>
+            <a class="crew-delete-seat" data-seat-id="{{id}}" title="Delete seat"><i class="fas fa-trash"></i></a>
+          {{/if}}
+        </div>
+      {{/each}}
+    </div>
+  {{else}}
+    <p class="items-empty">No seats defined.</p>
+  {{/if}}
+</section>

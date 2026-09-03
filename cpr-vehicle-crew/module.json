@@ -1,0 +1,41 @@
+{
+  "id": "cpr-vehicle-crew",
+  "title": "CPR Vehicle Crew",
+  "description": "Seat assignment for Cyberpunk RED vehicles that pins occupant tokens to the vehicle token so they move together, plus a simple per-seat access dropdown.",
+  "version": "0.1.0",
+  "compatibility": {
+    "minimum": "12",
+    "verified": "12"
+  },
+  "authors": [
+    {
+      "name": "Ryan Schultz"
+    }
+  ],
+  "relationships": {
+    "requires": [
+      {
+        "id": "cyberpunk-red-vehicles",
+        "type": "module",
+        "compatibility": {
+          "minimum": "1.1.1"
+        }
+      }
+    ],
+    "systems": [
+      {
+        "id": "cyberpunk-red-core",
+        "type": "system",
+        "compatibility": {
+          "minimum": "0.92.0"
+        }
+      }
+    ]
+  },
+  "esmodules": [
+    "scripts/main.js"
+  ],
+  "styles": [
+    "styles/crew.css"
+  ]
+}

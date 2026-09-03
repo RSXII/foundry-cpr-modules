@@ -1,0 +1,85 @@
+<div class="crq-card">
+  <div class="crq-head">
+    <img class="crq-portrait" src="{{actor.img}}" alt="" />
+    <div class="crq-head-main">
+      <div class="crq-name">{{actor.name}}</div>
+    </div>
+    <button type="button" class="crq-btn-link" data-action="open-sheet">Open sheet</button>
+  </div>
+
+  <div class="crq-badge-row">
+    {{#if isMook}}
+      <span class="crq-pill crq-sheet">Mook</span>
+    {{else}}
+      <span class="crq-pill crq-sheet">Major</span>
+    {{/if}}
+    {{#each factions}}
+      <span class="crq-pill crq-faction">{{this}}</span>
+    {{/each}}
+  </div>
+
+  <div class="crq-section-label">Relationships</div>
+
+  <div class="crq-rel-list">
+    {{#each rows}}
+      <div class="crq-rel-row{{#if hostile}} crq-rel-hostile{{/if}}" data-actor-id="{{id}}" style="background-image: url('{{img}}')">
+        <div class="crq-rel-mid">
+          <div class="crq-rel-top">
+            <span class="crq-rel-name">{{name}}</span>
+          </div>
+          <div class="crq-pip-wrap">
+            <div class="crq-pip-row">
+              {{#each pips}}
+                {{#if isHeart}}
+                  <svg class="crq-pip crq-pip-heart{{#if filled}} crq-pip-filled{{/if}}" style="color:{{color}}" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 21s-7.5-4.7-10-9.2C.4 8.6 2 5 5.5 5c2 0 3.4 1.1 4.5 2.7C11.1 6.1 12.5 5 14.5 5 18 5 19.6 8.6 22 11.8 19.5 16.3 12 21 12 21z" fill="currentColor" />
+                  </svg>
+                {{else}}
+                  <svg class="crq-pip crq-pip-bullet{{#if filled}} crq-pip-filled{{/if}}" style="color:{{color}}" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 2 L14 8 L17 10 L17 21 Q17 22 16 22 L8 22 Q7 22 7 21 L7 10 L10 8 Z" fill="currentColor" />
+                  </svg>
+                {{/if}}
+              {{/each}}
+            </div>
+            {{#if hostile}}
+              <div class="crq-hostile-tag">Hostile</div>
+            {{/if}}
+          </div>
+          {{#if ../isGM}}
+            <span class="crq-pill crq-fan crq-fan-toggle{{#unless fan}} crq-fan-off{{/unless}}" data-action="toggle-fan">{{#if fan}}Fan{{else}}+ Fan{{/if}}</span>
+          {{else}}
+            <span class="crq-pill crq-fan{{#unless fan}} crq-fan-hidden{{/unless}}">Fan</span>
+          {{/if}}
+        </div>
+        {{#if ../isGM}}
+          <div class="crq-row-actions">
+            <div class="crq-stepper">
+              <button type="button" data-action="dec" aria-label="Decrease">-</button>
+              <span class="crq-pts">{{points}}</span>
+              <button type="button" data-action="inc" aria-label="Increase">+</button>
+            </div>
+            <button type="button" class="crq-remove" data-action="remove-relationship" aria-label="Remove relationship" title="Remove relationship">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path d="M5 7h14M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M8 7l1 13a1 1 0 0 0 1 1h4a1 1 0 0 0 1-1l1-13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+            </button>
+          </div>
+        {{/if}}
+      </div>
+    {{else}}
+      <div class="crq-empty">No tracked relationships yet.</div>
+    {{/each}}
+  </div>
+
+  {{#if isGM}}
+    <div class="crq-add-row">
+      <select data-action="add-target">
+        <option value="">Add relationship…</option>
+        {{#each available}}
+          <option value="{{id}}">{{name}}</option>
+        {{/each}}
+      </select>
+      <button type="button" class="crq-btn-link" data-action="add-relationship">Add</button>
+    </div>
+  {{/if}}
+</div>

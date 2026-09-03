@@ -1,0 +1,21 @@
+{
+  "id": "cpr-relations",
+  "title": "CPR Relations",
+  "description": "Per-PC relationship tracking, faction tags, and a JRPG-style quick-view for NPC and PC actors in Cyberpunk Red.",
+  "version": "0.1.0",
+  "compatibility": {
+    "minimum": "12",
+    "verified": "12"
+  },
+  "authors": [
+    {
+      "name": "Ryan Schultz"
+    }
+  ],
+  "esmodules": [
+    "scripts/main.js"
+  ],
+  "styles": [
+    "styles/relations.css"
+  ]
+}

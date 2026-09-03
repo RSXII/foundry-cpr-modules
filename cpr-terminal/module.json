@@ -1,0 +1,21 @@
+{
+  "id": "cpr-terminal",
+  "title": "CPR Terminal",
+  "description": "Opens the FCOS terminal (the S.K.AM Advanced Magitechnologies fake in-browser OS) in a window inside Foundry, and lets the GM broadcast a map destination to every connected terminal.",
+  "version": "0.2.1",
+  "compatibility": {
+    "minimum": "12",
+    "verified": "12"
+  },
+  "authors": [
+    {
+      "name": "Ryan Schultz"
+    }
+  ],
+  "esmodules": [
+    "scripts/main.js"
+  ],
+  "styles": [
+    "styles/terminal.css"
+  ]
+}
