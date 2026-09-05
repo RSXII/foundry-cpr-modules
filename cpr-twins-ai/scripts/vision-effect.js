@@ -6,17 +6,25 @@
 // HUD readout, not that module's bezel-ring family. See README for why the
 // two are kept deliberately distinct.
 
-import { MODULE_ID, claimedTokensOnScene } from './data.js';
+import { MODULE_ID, claimedTokensOnScene, MAX_ACTIVE_LINKS } from './data.js';
 import { getTokenScreenBox } from './token-geometry.js';
 import { ensureLockLayer } from './dom-layer.js';
 
-const MAX_CHIPS = 5;
+// Same value data.js's grantControl() actually enforces — imported rather
+// than a separate local 5, so the chip/CPU-floor display can never drift
+// from what's really allowed the way it did before that enforcement existed.
+const MAX_CHIPS = MAX_ACTIVE_LINKS;
 const CPU_CRITICAL_PCT = 80;
 const GLITCH_CHARS = '01<>[]/\\#%&$?';
 // Kept in sync with the CSS keyframes it toggles (cprTaHudJitter,
 // cprTaFlashPulse, cprTaTextGlitch) — dialed down from an original 420ms
 // against the design-preview artifact.
 const BURST_DUR_MS = 120;
+
+// Kept in sync with cprTaPowerOnFlicker's duration in twins-ai.css — how
+// long the vision-filter layers (duotone/vignette/scanlines) spend
+// flickering before they settle into their steady, breathing state.
+const POWERON_FLICKER_MS = 900;
 
 // The HUD's px/rem measurements are all authored against a safe-area width
 // of roughly this many CSS pixels — see _layout()'s comment for why that
@@ -40,6 +48,64 @@ const TEMP_BAR_MAX = 42.0;
 // ---- terminal window ----
 const TERMINAL_LINE_MS = 420; // pace between queued lines, ambient or take-control alike
 const TERMINAL_MAX_LINES = 6; // older lines are pruned once the box is full, not scrolled
+
+// ---- boot sequence: the cinematic pre-roll mount() plays before the
+// persistent HUD above ever appears. Cold open (typed dialogue) -> logo
+// alone on black -> sync bar + AI terminal log + shake + warning-popup
+// cascade -> hands off into the HUD's own entrance. Values below are the
+// ones dialed in and confirmed against the design-preview artifact. ----
+
+// The human beat before any of the AI's own boot log — typed, not faded
+// in, with a beat of just the cursor blinking alone in between. Plain
+// ink-white (.cpr-twins-ai-boot-cold-line), not the AI's accent-green
+// system-voice styling: this is someone typing, not a readout.
+const COLD_OPEN_LINE_1 = 'I guess we have to do this then huh?';
+const COLD_OPEN_LINE_2 = 'Here goes nothing.';
+const COLD_OPEN_CHAR_MS = 40;
+const COLD_OPEN_PAUSE_MS = 2000;
+const COLD_OPEN_HOLD_MS = 700;
+
+// Logo alone over black, before the sync bar/terminal/shake show up.
+const BOOT_LOGO_FADE_MS = 3000;
+const BOOT_LOGO_HOLD_MS = 500;
+
+// The main phase: sync bar fills over this duration while the screen
+// shakes and warning popups cascade, both accelerating on the same
+// quadratic ease so they read as one escalation, not two effects that
+// happen to overlap.
+const BOOT_MAIN_DURATION_MS = 9200;
+const BOOT_SHAKE_START_PX = 1;
+const BOOT_SHAKE_END_PX = 14;
+
+const BOOT_TERMINAL_LINES = [
+  'INITIALIZING S.K.AM UPLINK...',
+  'LOADING NEURAL BRIDGE...',
+  'CALIBRATING SENSORY FEED...',
+  'BYPASSING LOCAL FIREWALL...',
+  'ESTABLISHING GHOST CHANNEL...',
+  'NEUROPORT HANDSHAKE...',
+  'SYNCHRONIZING EPSILON NODE...',
+  'STABILIZING SIGNAL...',
+  'VISION ONLINE.',
+];
+const BOOT_TERMINAL_MAX_LINES = 6;
+
+const POPUP_TITLES = ['WARNING', 'SYSTEM ALERT', 'ERROR', 'CRITICAL'];
+const POPUP_MESSAGES = [
+  'UNAUTHORIZED ACCESS DETECTED',
+  'MEMORY INTEGRITY: 34%',
+  'THERMAL LIMIT APPROACHING',
+  'SIGNAL DESYNC — NODE 3',
+  'PACKET CORRUPTION: HIGH',
+  'ICE COUNTERMEASURE ENGAGED',
+  'HOST VITALS UNSTABLE',
+  'BANDWIDTH OVERFLOW',
+  'NEURAL FEEDBACK SPIKE',
+  'CONNECTION INTEGRITY: LOW',
+  'FIREWALL BREACH — SECTOR 7',
+  'ANOMALY: UNIDENTIFIED PROCESS',
+];
+const POPUP_MAX = 324; // safety cap regardless of BOOT_MAIN_DURATION_MS
 
 // Ambient background chatter for the terminal window — sells "this AI is
 // doing a hundred other things besides you" for as long as the mode is on.
@@ -275,10 +341,27 @@ export class VisionEffect {
     this._terminalTimer = null;
     this._terminalQueue = [];
     this._ambientTimer = null;
+
+    this._bootEl = null;
+    this._bootLogoEl = null;
+    this._bootProgressEl = null;
+    this._bootTerminalEl = null;
+    this._bootColdStageEl = null;
+    this._bootPopupLayerEl = null;
+    this._bootShakeTimer = null;
+    this._bootLineTimer = null;
+    this._bootEndTimer = null;
+    this._popupTimer = null;
+    this._bootActive = false;
   }
 
   get mounted() {
     return !!this.el;
+  }
+
+  /** True for as long as the boot sequence is playing — overlay.js hides target locks/claim markers while this is true, since nothing should visually compete with (or be clickable under) the cinematic pre-roll. */
+  get booting() {
+    return this._bootActive;
   }
 
   mount() {
@@ -295,6 +378,17 @@ export class VisionEffect {
     this._resizeObserver = new ResizeObserver(() => this._layout());
     this._resizeObserver.observe(this._canvasEl);
 
+    // The boot sequence plays first; the persistent HUD only reveals
+    // itself once that resolves. If destroy() runs mid-boot, _bootWait()'s
+    // pending timer was already cleared by _stopBootTimers(), so this
+    // promise just never resolves — _revealHud() never fires, and there's
+    // nothing left to unwind.
+    this._playBootSequence().then(() => this._revealHud());
+  }
+
+  /** The persistent HUD's own entrance — runs once the boot sequence hands off. */
+  _revealHud() {
+    if (!this.el) return;
     // Next frame so the entrance opacity transitions actually transition
     // instead of snapping straight to their end state. The one-shot jitter
     // sells "just booted up" — removed after it plays so it doesn't repeat.
@@ -302,6 +396,15 @@ export class VisionEffect {
       if (!this.el) return;
       this.el.classList.add('cpr-twins-ai-vision--active', 'cpr-twins-ai-vision--jitter');
       if (!reduceMotion()) {
+        // The vision filter (duotone/vignette/scanlines) flickers on rather
+        // than smoothly fading up — see cprTaPowerOnFlicker in twins-ai.css
+        // — selling "the feed is switching over to combined AI vision," not
+        // just "the HUD faded in." Removed once it's played through; the
+        // --active rules already sitting on these same layers pick up
+        // exactly where the flicker left off (its last keyframe step is
+        // each layer's own resting opacity), so there's no snap.
+        this.el.classList.add('cpr-twins-ai-vision--poweron');
+        window.setTimeout(() => this.el?.classList.remove('cpr-twins-ai-vision--poweron'), POWERON_FLICKER_MS);
         window.setTimeout(() => this.el?.classList.remove('cpr-twins-ai-vision--jitter'), BURST_DUR_MS);
       } else {
         this.el.classList.remove('cpr-twins-ai-vision--jitter');
@@ -336,6 +439,9 @@ export class VisionEffect {
     this._terminalTimer = null;
     this._terminalQueue = [];
     this._stopAmbientTerminal();
+    this._stopBootTimers();
+    this._clearPopups();
+    this._bootActive = false;
     this._canvasEl = null;
     this.el.remove();
     this.el = null;
@@ -419,8 +525,25 @@ export class VisionEffect {
       </div>
       </div>
       <div class="cpr-twins-ai-vhs-line"></div>
+
+      <div class="cpr-twins-ai-boot" data-boot>
+        <div class="cpr-twins-ai-boot-popup-layer" data-boot-popup-layer></div>
+        <div class="cpr-twins-ai-boot-cold-stage" data-boot-cold-stage></div>
+        <div class="cpr-twins-ai-boot-logo" data-boot-logo aria-hidden="true"></div>
+        <div class="cpr-twins-ai-boot-sync">
+          <div class="cpr-twins-ai-boot-sync-label">SYNCHING TO EPSILON</div>
+          <div class="cpr-twins-ai-boot-progress"><i data-boot-progress></i></div>
+        </div>
+        <div class="cpr-twins-ai-boot-terminal" data-boot-terminal></div>
+      </div>
     `;
 
+    this._bootEl = root.querySelector('[data-boot]');
+    this._bootLogoEl = root.querySelector('[data-boot-logo]');
+    this._bootProgressEl = root.querySelector('[data-boot-progress]');
+    this._bootTerminalEl = root.querySelector('[data-boot-terminal]');
+    this._bootColdStageEl = root.querySelector('[data-boot-cold-stage]');
+    this._bootPopupLayerEl = root.querySelector('[data-boot-popup-layer]');
     this._safeEl = root.querySelector('.cpr-twins-ai-safe');
     this._hudEl = root.querySelector('.cpr-twins-ai-hud');
     this._counterEl = root.querySelector('[data-counter]');
@@ -487,6 +610,217 @@ export class VisionEffect {
   /** Re-runs layout on demand — e.g. after the HUD-scale client setting changes, so the new value takes effect without a remount. */
   relayout() {
     this._layout();
+  }
+
+  // ---- Boot sequence: the cinematic pre-roll mount() plays before the
+  // persistent HUD above ever appears. Cold open -> logo alone on black ->
+  // sync bar/AI terminal log/shake/warning-popup cascade -> resolves, at
+  // which point mount() reveals the HUD. Shakes this.el (the whole vision
+  // root) rather than Foundry's own canvas element — deliberately: the
+  // boot overlay covers virtually the whole screen for its own duration,
+  // so shaking just this root reads as "the screen is unstable" without
+  // touching the canvas Foundry itself uses for click/drag coordinates. ----
+
+  _stopBootTimers() {
+    if (this._bootShakeTimer) clearTimeout(this._bootShakeTimer);
+    this._bootShakeTimer = null;
+    if (this._bootLineTimer) clearTimeout(this._bootLineTimer);
+    this._bootLineTimer = null;
+    if (this._bootEndTimer) clearTimeout(this._bootEndTimer);
+    this._bootEndTimer = null;
+    if (this._popupTimer) clearTimeout(this._popupTimer);
+    this._popupTimer = null;
+  }
+
+  _bootWait(ms) {
+    return new Promise((resolve) => { this._bootLineTimer = window.setTimeout(resolve, ms); });
+  }
+
+  /** Reveals `text` into `el` one character at a time; resolves once the last character lands. */
+  _typeInto(el, text, charMs) {
+    return new Promise((resolve) => {
+      let i = 0;
+      const tick = () => {
+        el.textContent = text.slice(0, i);
+        i++;
+        if (i <= text.length) this._bootLineTimer = window.setTimeout(tick, charMs);
+        else resolve();
+      };
+      tick();
+    });
+  }
+
+  _clearPopups() {
+    if (this._bootPopupLayerEl) this._bootPopupLayerEl.innerHTML = '';
+  }
+
+  _spawnPopup() {
+    const el = document.createElement('div');
+    el.className = 'cpr-twins-ai-boot-popup';
+    el.style.left = `${(4 + Math.random() * 82).toFixed(1)}%`;
+    el.style.top = `${(8 + Math.random() * 74).toFixed(1)}%`;
+    el.style.setProperty('--r', `${(Math.random() * 14 - 7).toFixed(1)}deg`);
+    const title = POPUP_TITLES[Math.floor(Math.random() * POPUP_TITLES.length)];
+    const msg = POPUP_MESSAGES[Math.floor(Math.random() * POPUP_MESSAGES.length)];
+    el.innerHTML = `<div class="cpr-twins-ai-boot-popup-bar">${title} <i class="cpr-twins-ai-boot-popup-close">×</i></div><div class="cpr-twins-ai-boot-popup-body">${msg}</div>`;
+    this._bootPopupLayerEl.appendChild(el);
+  }
+
+  /** The scripted human beat before any of the AI's own boot log. */
+  async _playColdOpen() {
+    if (reduceMotion()) return;
+    this._bootEl.classList.add('cold');
+
+    const line1 = document.createElement('div');
+    line1.className = 'cpr-twins-ai-boot-cold-line';
+    this._bootColdStageEl.appendChild(line1);
+    await this._typeInto(line1, COLD_OPEN_LINE_1, COLD_OPEN_CHAR_MS);
+
+    const line2 = document.createElement('div');
+    line2.className = 'cpr-twins-ai-boot-cold-line';
+    const line2Text = document.createElement('span');
+    const cursor = document.createElement('span');
+    cursor.className = 'cpr-twins-ai-blink';
+    cursor.textContent = '_';
+    line2.append(line2Text, cursor);
+    this._bootColdStageEl.appendChild(line2);
+
+    await this._bootWait(COLD_OPEN_PAUSE_MS);
+    await this._typeInto(line2Text, COLD_OPEN_LINE_2, COLD_OPEN_CHAR_MS);
+    await this._bootWait(COLD_OPEN_HOLD_MS);
+
+    // Stays .cold — _playBootSequence() lifts it once the logo has had its
+    // own moment alone on black. Only the scripted dialogue clears here.
+    this._bootColdStageEl.innerHTML = '';
+  }
+
+  /** Logo alone on black, faded in slowly — the beat between the cold open and everything else showing up. */
+  async _playLogoReveal() {
+    // No reflow-forcing trick needed here, unlike the progress bar below —
+    // the logo has already been sitting at opacity:0 since the cold open
+    // started (several seconds ago by now), not something just set this
+    // same tick, so there's no same-frame race to guard against.
+    this._bootLogoEl.classList.add('in');
+    if (reduceMotion()) return;
+    await this._bootWait(BOOT_LOGO_FADE_MS + BOOT_LOGO_HOLD_MS);
+  }
+
+  /** Orchestrates the whole boot sequence; resolves once it's done and the HUD should take over. */
+  async _playBootSequence() {
+    if (this._bootActive) return;
+    this._bootActive = true;
+    // overlay.js resets its outline-reveal state on this — the outlines'
+    // delayed fade-in (see bootEnd below) is a one-shot cinematic beat per
+    // boot cycle, not a permanent rule, so a mode toggled off and back on
+    // needs to play it again rather than leaving the layer already visible
+    // from last time.
+    Hooks.callAll(`${MODULE_ID}.bootStart`);
+    this._stopBootTimers();
+    this._bootTerminalEl.innerHTML = '';
+    this._bootColdStageEl.innerHTML = '';
+    this._clearPopups();
+    this._bootLogoEl.classList.remove('in');
+    this._bootProgressEl.style.transition = 'none';
+    this._bootProgressEl.style.width = '0%';
+    this.el.style.transform = '';
+    // Hard cut to black for the cold open — no fade, it should read as an
+    // abrupt "screen goes dark," not a dissolve. The normal opacity
+    // transition comes back for the fade-out at the very end.
+    this._bootEl.style.transition = 'none';
+    this._bootEl.classList.add('show', 'cold');
+    void this._bootEl.offsetWidth;
+    this._bootEl.style.transition = '';
+
+    await this._playColdOpen();
+    await this._playLogoReveal();
+    if (!this.el) return; // destroy() ran mid-boot
+    this._bootEl.classList.remove('cold');
+
+    const durationMs = BOOT_MAIN_DURATION_MS;
+    const startTime = performance.now();
+
+    if (!reduceMotion()) {
+      // No reflow-forcing trick needed — width:0% was set well before this
+      // point (cold open + logo reveal both ran in between), so it's
+      // already settled rather than being changed twice in the same tick.
+      this._bootProgressEl.style.transition = `width ${durationMs}ms linear`;
+      this._bootProgressEl.style.width = '100%';
+
+      // Amplitude and the gap between shakes both ease in together — that's
+      // the "starts slow, speeds up toward the end" feel, not two separate
+      // effects. eased = t*t (quadratic) so the acceleration itself ramps
+      // up rather than growing at a constant rate.
+      const shake = () => {
+        if (!this.el) return;
+        const elapsed = performance.now() - startTime;
+        const t = Math.min(elapsed / durationMs, 1);
+        if (t >= 1) { this.el.style.transform = ''; return; }
+        const eased = t * t;
+        const amplitude = BOOT_SHAKE_START_PX + eased * (BOOT_SHAKE_END_PX - BOOT_SHAKE_START_PX);
+        const dx = (Math.random() * 2 - 1) * amplitude;
+        const dy = (Math.random() * 2 - 1) * amplitude;
+        this.el.style.transform = `translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px)`;
+        const nextDelay = 110 - eased * 85;
+        this._bootShakeTimer = window.setTimeout(shake, nextDelay);
+      };
+      shake();
+
+      // Same accelerating curve as the shake above, deliberately — the
+      // popups piling up and the screen shaking harder should read as one
+      // escalation.
+      let popupCount = 0;
+      const popupLoop = () => {
+        if (!this._bootPopupLayerEl) return;
+        const elapsed = performance.now() - startTime;
+        const t = Math.min(elapsed / durationMs, 1);
+        if (t >= 1 || popupCount >= POPUP_MAX) return;
+        this._spawnPopup();
+        popupCount++;
+        const eased = t * t;
+        const nextDelay = 250 - eased * 350;
+        this._popupTimer = window.setTimeout(popupLoop, nextDelay);
+      };
+      popupLoop();
+    } else {
+      this._bootProgressEl.style.width = '100%';
+    }
+
+    const feedLine = () => {
+      if (!this._bootTerminalEl) return;
+      let i = 0;
+      const step = () => {
+        if (i >= BOOT_TERMINAL_LINES.length) return;
+        const row = document.createElement('div');
+        row.className = 'cpr-twins-ai-boot-terminal-line';
+        row.textContent = BOOT_TERMINAL_LINES[i++];
+        this._bootTerminalEl.appendChild(row);
+        while (this._bootTerminalEl.children.length > BOOT_TERMINAL_MAX_LINES) {
+          this._bootTerminalEl.removeChild(this._bootTerminalEl.firstChild);
+        }
+        this._bootLineTimer = window.setTimeout(step, durationMs / BOOT_TERMINAL_LINES.length);
+      };
+      step();
+    };
+    feedLine();
+
+    return new Promise((resolve) => {
+      this._bootEndTimer = window.setTimeout(() => {
+        if (this.el) {
+          this._bootEl.classList.remove('show');
+          this.el.style.transform = '';
+        }
+        this._stopBootTimers();
+        this._clearPopups();
+        this._bootActive = false;
+        // overlay.js hides target locks/claim markers for as long as
+        // .booting reads true (nothing should be clickable under the
+        // cinematic pre-roll) and re-evaluates them all once this fires,
+        // rather than waiting on some unrelated token/setting hook to
+        // happen to fire and refresh them incidentally.
+        Hooks.callAll(`${MODULE_ID}.bootEnd`);
+        resolve();
+      }, durationMs);
+    });
   }
 
   // ---- T+ counter: ms-resolution readout, running only while mounted ----

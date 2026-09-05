@@ -7,6 +7,11 @@ export const MODULE_ID = 'cpr-twins-ai';
 
 export const OWNERSHIP = { NONE: 0, OBSERVER: 2, OWNER: 3 };
 
+// "5 is the max" — the CPU meter's floor, the redline, and the Active
+// Links chips all assume this ceiling for their own display math, but
+// none of them enforce it. grantControl() below is what actually does.
+export const MAX_ACTIVE_LINKS = 5;
+
 // CPR's own actor type string for mooks, confirmed against a real world by
 // ../cpr-relations/scripts/data.js. The vehicle type is a module-namespaced
 // subtype registered by cyberpunk-red-vehicles (see
@@ -61,9 +66,18 @@ export function claimedTokensOnScene(scene = canvas.scene) {
  * Deliberately does not touch prototypeToken.ownership — this grant is
  * meant to be a one-off, revocable claim, not a template change that would
  * make future-placed tokens of this actor spawn pre-owned.
+ *
+ * Returns true on an actual grant, false if it refused (not the GM, or the
+ * scene's already at MAX_ACTIVE_LINKS) — callers need this to know whether
+ * to report success, since a refusal is otherwise silent. Checked here,
+ * not just at the request-handling layer in socket.js, so this stays true
+ * regardless of caller: two requests landing close enough together to both
+ * pass socket.js's own pre-check would otherwise both grant, since that
+ * check alone can't see the other one's write.
  */
 export async function grantControl(tokenDoc, userId) {
-  if (!game.user.isGM) return;
+  if (!game.user.isGM) return false;
+  if (claimedTokensOnScene(tokenDoc.parent).length >= MAX_ACTIVE_LINKS) return false;
   if (tokenDoc.actorLink) {
     await tokenDoc.actor.update({ [`ownership.${userId}`]: OWNERSHIP.OWNER });
     await tokenDoc.setFlag(MODULE_ID, 'controlledBy', userId);
@@ -88,6 +102,7 @@ export async function grantControl(tokenDoc, userId) {
       await tokenDoc.actor.update({ ownership: actorOwnership });
     }
   }
+  return true;
 }
 
 /** Inverse of grantControl(): resets ownership for the current controller and clears the claim, freeing the token back up. No-op if nobody currently controls it. */

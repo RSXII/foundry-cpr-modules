@@ -8,6 +8,8 @@ import {
   removeSeat,
   assignOccupant,
   clearOccupant,
+  isAutonomous,
+  setAutonomous,
 } from './data.js';
 import { findVehicleToken, snapOccupantToSeat, captureSeatOffset } from './token-follow.js';
 import { accessLevelFor, setSeatAccess } from './permissions.js';
@@ -57,6 +59,7 @@ async function _insertCrewSection(app, html) {
     seats,
     hasSeats: seats.length > 0,
     editable: game.user.isGM,
+    autonomous: isAutonomous(actor),
   });
 
   const anchor = html.find('section.vehicle-notes');
@@ -71,6 +74,10 @@ async function _insertCrewSection(app, html) {
 }
 
 function _bindListeners(app, html, actor) {
+  html.find('.crew-autonomous').on('change', async (ev) => {
+    await setAutonomous(actor, ev.currentTarget.checked);
+  });
+
   html.find('.crew-add-seat').on('click', async (ev) => {
     ev.preventDefault();
     new Dialog({

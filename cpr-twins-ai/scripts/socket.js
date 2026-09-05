@@ -13,7 +13,10 @@
 // already proven to work, at the cost of a message flashing briefly in
 // the GM's chat log before this deletes it.
 
-import { MODULE_ID, isModeEnabled, isTakeableType, isTakeable, controllerOf, grantControl } from './data.js';
+import {
+  MODULE_ID, isModeEnabled, isTakeableType, isTakeable, controllerOf, grantControl,
+  claimedTokensOnScene, MAX_ACTIVE_LINKS,
+} from './data.js';
 
 const REQUEST_FLAG = 'requestControl';
 
@@ -56,9 +59,21 @@ async function handleRequestControl({ tokenUuid, userId } = {}) {
     console.warn(`${MODULE_ID} | request-control: ignored, not eligible`, tokenDoc.name);
     return;
   }
+  if (claimedTokensOnScene(tokenDoc.parent).length >= MAX_ACTIVE_LINKS) {
+    console.warn(`${MODULE_ID} | request-control: ignored, ${MAX_ACTIVE_LINKS} active links already claimed`, tokenDoc.name);
+    return;
+  }
 
   console.log(`${MODULE_ID} | granting control of`, tokenDoc.name, 'to', userId);
-  await grantControl(tokenDoc, userId);
+  // grantControl() re-checks the same cap right before it actually writes —
+  // the check above is just for a clear, specific log line here. Two
+  // requests landing close enough together to both pass it would otherwise
+  // both grant, since neither one can see the other's write yet.
+  const granted = await grantControl(tokenDoc, userId);
+  if (!granted) {
+    console.warn(`${MODULE_ID} | request-control: grantControl refused`, tokenDoc.name);
+    return;
+  }
   const user = game.users.get(userId);
   ui.notifications.info(`${user?.name ?? 'A player'} took control of ${tokenDoc.name}.`);
 }

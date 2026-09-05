@@ -135,3 +135,86 @@ export async function clearOccupant(vehicleActor, seatId) {
 export function getActorOwner(actor) {
   return game.users.find((u) => !u.isGM && actor.testUserPermission(u, 'OWNER')) ?? null;
 }
+
+/** Whether this vehicle fires its own weapons (autopilot) when no seat is occupied. */
+export function isAutonomous(actor) {
+  return !!actor?.getFlag(MODULE_ID, 'autonomous');
+}
+
+export async function setAutonomous(actor, value) {
+  if (!game.user.isGM) return;
+  await actor.setFlag(MODULE_ID, 'autonomous', !!value);
+}
+
+// Baseline REF/DEX and skill level given to a freshly-created autopilot
+// actor — a competent-but-unremarkable gunnery computer. GM can hand-tune
+// either afterward directly on the actor sheet; this is only a starting
+// point, so later calls never overwrite a level that's already nonzero.
+const AUTOPILOT_DEFAULT_STAT = 6;
+const AUTOPILOT_DEFAULT_SKILL_LEVEL = 6;
+
+/**
+ * The hidden actor that stands in as "shooter" for an autonomous vehicle's
+ * mounted weapons when no crew member is seated. Lazily created once per
+ * vehicle and remembered via flag; the core system's attack-roll code needs
+ * a real actor with stats and a skill item, and a vehicle actor has neither.
+ */
+export async function getOrCreateAutopilotActor(vehicleActor) {
+  const uuid = vehicleActor.getFlag(MODULE_ID, 'autopilotActorUuid');
+  if (uuid) {
+    const existing = await fromUuid(uuid);
+    if (existing) {
+      // Recover from actors created before the create()-bypass fix below:
+      // those got stats but none of the core skill items (Heavy Weapons,
+      // Autofire, etc). The system's own createEmbeddedDocuments override
+      // refuses to add anything flagged system.core after the fact (that's
+      // the "Do not try to add core items..." warning) — core skills can
+      // only be seeded through Actor.create()'s special item-injection
+      // path, so a broken one can't be patched, only rebuilt.
+      const hasSkills = (existing.itemTypes?.skill ?? []).length > 0;
+      if (hasSkills) return existing;
+      if (!game.user.isGM) return null;
+      await existing.delete();
+    }
+  }
+  if (!game.user.isGM) return null;
+
+  // No `system` key here on purpose: CPRActor.create() only auto-injects
+  // the full core skill list when it sees an actor with no `system` data
+  // yet — passing stats up front here would make it look like an
+  // existing/imported actor and skip that injection.
+  const actor = await Actor.create({
+    name: `${vehicleActor.name} — Autopilot`,
+    type: 'mook',
+  });
+  await actor.update({
+    'system.stats.ref.value': AUTOPILOT_DEFAULT_STAT,
+    'system.stats.dex.value': AUTOPILOT_DEFAULT_STAT,
+  });
+  await vehicleActor.setFlag(MODULE_ID, 'autopilotActorUuid', actor.uuid);
+  return actor;
+}
+
+/**
+ * Bumps the autopilot actor's level in `skillName` up from the seeded
+ * default of 0, the first time that skill is actually needed to fire.
+ * Only touches a level still sitting at 0, so a GM's deliberate tuning
+ * (including intentionally setting one to 0) sticks. If the skill item
+ * isn't present at all, the actor predates the core-skill fix and needs
+ * rebuilding — see getOrCreateAutopilotActor — so this just warns rather
+ * than trying to add it (the system blocks adding core items post-creation).
+ */
+export async function ensureAutopilotSkill(autopilotActor, skillName) {
+  if (!game.user.isGM || !skillName) return;
+  const skillItem = autopilotActor.items.find(
+    (i) => i.type === 'skill' && i.name === skillName
+  );
+  if (!skillItem) {
+    console.warn(
+      `cpr-vehicle-crew | Autopilot actor "${autopilotActor.name}" has no "${skillName}" skill item and can't be repaired in place — delete it and fire again to rebuild it.`
+    );
+    return;
+  }
+  if (Number(skillItem.system.level) !== 0) return;
+  await skillItem.update({ 'system.level': AUTOPILOT_DEFAULT_SKILL_LEVEL });
+}

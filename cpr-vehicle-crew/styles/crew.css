@@ -26,6 +26,14 @@
   padding: 0.1rem 0.5rem;
 }
 
+.crew-autonomous-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: var(--cpr-font-small, 0.9rem);
+  margin-bottom: 0.35rem;
+}
+
 .crew-seat-list {
   display: flex;
   flex-direction: column;

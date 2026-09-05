@@ -1,0 +1,16 @@
+<hr/>
+<li class="item flexrow cpr-attack-sfx-row">
+  <div class="item flexrow setting-name text-nowrap">
+    Attack Sound
+  </div>
+  <div class="item flexrow setting-value text-nowrap item-end cpr-attack-sfx-controls">
+    {{#if soundPath}}
+      <span class="cpr-attack-sfx-filename text-flex-end" title="{{soundPath}}">{{soundLabel}}</span>
+      <a class="cpr-attack-sfx-play" data-tooltip="Preview"><i class="fas fa-play"></i></a>
+      <a class="cpr-attack-sfx-clear" data-tooltip="Clear"><i class="fas fa-trash"></i></a>
+    {{else}}
+      <span class="cpr-attack-sfx-filename text-flex-end cpr-attack-sfx-none">None</span>
+    {{/if}}
+    <a class="cpr-attack-sfx-pick" data-tooltip="Choose sound file"><i class="fas fa-folder-open"></i></a>
+  </div>
+</li>

@@ -1,0 +1,19 @@
+.cpr-attack-sfx-controls {
+  gap: 6px;
+}
+
+.cpr-attack-sfx-filename {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cpr-attack-sfx-none {
+  opacity: 0.6;
+  font-style: italic;
+}
+
+.cpr-attack-sfx-pick,
+.cpr-attack-sfx-play,
+.cpr-attack-sfx-clear {
+  flex: 0 0 auto;
+}

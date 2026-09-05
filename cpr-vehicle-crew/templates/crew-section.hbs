@@ -6,6 +6,11 @@
     {{/if}}
   </div>
 
+  <label class="crew-autonomous-toggle" title="When no seat is occupied, mounted weapons fire using this vehicle's own autopilot actor instead of prompting for a shooter.">
+    <input type="checkbox" class="crew-autonomous" {{#unless editable}}disabled{{/unless}} {{#if autonomous}}checked{{/if}} />
+    Autonomous (fire via autopilot when unmanned)
+  </label>
+
   {{#if hasSeats}}
     <div class="crew-seat-list">
       {{#each seats}}
