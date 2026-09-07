@@ -15,7 +15,7 @@
 
 import {
   MODULE_ID, isModeEnabled, isTakeableType, isTakeable, controllerOf, grantControl,
-  claimedTokensOnScene, MAX_ACTIVE_LINKS,
+  claimedTokensOnScene, effectiveMaxActiveLinks,
 } from './data.js';
 
 const REQUEST_FLAG = 'requestControl';
@@ -59,8 +59,9 @@ async function handleRequestControl({ tokenUuid, userId } = {}) {
     console.warn(`${MODULE_ID} | request-control: ignored, not eligible`, tokenDoc.name);
     return;
   }
-  if (claimedTokensOnScene(tokenDoc.parent).length >= MAX_ACTIVE_LINKS) {
-    console.warn(`${MODULE_ID} | request-control: ignored, ${MAX_ACTIVE_LINKS} active links already claimed`, tokenDoc.name);
+  const cap = effectiveMaxActiveLinks();
+  if (claimedTokensOnScene(tokenDoc.parent).length >= cap) {
+    console.warn(`${MODULE_ID} | request-control: ignored, ${cap} active links already claimed`, tokenDoc.name);
     return;
   }
 

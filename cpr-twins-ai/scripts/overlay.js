@@ -159,6 +159,16 @@ function refreshMarker(token) {
 function buildOutline(kind) {
   const el = document.createElement('div');
   el.className = `cpr-twins-ai-scan-outline cpr-twins-ai-scan-outline--${kind}`;
+  // Randomized per outline so the erratic flicker (see .cpr-twins-ai-
+  // outlines-erratic in twins-ai.css, toggled by the intrusionStart/End
+  // hooks below) doesn't snap every token's border to the same beat — a
+  // negative delay starts the animation already partway into its own
+  // cycle, and a randomized duration keeps it from ever resyncing with
+  // the others even if two outlines happened to start at the same
+  // instant. Harmless to set unconditionally: it only does anything once
+  // the erratic class is actually applied.
+  el.style.setProperty('--cpr-ta-flicker-duration', `${(0.7 + Math.random() * 0.9).toFixed(2)}s`);
+  el.style.setProperty('--cpr-ta-flicker-delay', `-${(Math.random() * 1.6).toFixed(2)}s`);
   ensureLockLayer().appendChild(el);
   return el;
 }
@@ -346,6 +356,18 @@ export function registerOverlayHooks() {
   Hooks.on(`${MODULE_ID}.bootEnd`, () => {
     refreshAll();
     scheduleOutlineReveal();
+  });
+
+  // Netrunner intrusion: the outlines flicker erratically for as long as
+  // one's live (see .cpr-twins-ai-outlines-erratic in twins-ai.css and the
+  // per-outline randomized timing in buildOutline() above) — "the AI is
+  // struggling to hold the link," same read as the HUD's own jitter bursts
+  // speeding up during a breach.
+  Hooks.on(`${MODULE_ID}.intrusionStart`, () => {
+    ensureLockLayer().classList.add('cpr-twins-ai-outlines-erratic');
+  });
+  Hooks.on(`${MODULE_ID}.intrusionEnd`, () => {
+    ensureLockLayer().classList.remove('cpr-twins-ai-outlines-erratic');
   });
 
   // Fires every tick while a token glides/rotates — reposition only, the

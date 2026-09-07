@@ -6,7 +6,7 @@
 // HUD readout, not that module's bezel-ring family. See README for why the
 // two are kept deliberately distinct.
 
-import { MODULE_ID, claimedTokensOnScene, MAX_ACTIVE_LINKS } from './data.js';
+import { MODULE_ID, claimedTokensOnScene, MAX_ACTIVE_LINKS, isCacheCorrupted } from './data.js';
 import { getTokenScreenBox } from './token-geometry.js';
 import { ensureLockLayer } from './dom-layer.js';
 
@@ -15,6 +15,21 @@ import { ensureLockLayer } from './dom-layer.js';
 // from what's really allowed the way it did before that enforcement existed.
 const MAX_CHIPS = MAX_ACTIVE_LINKS;
 const CPU_CRITICAL_PCT = 80;
+// How wildly CPU/MEM swing for as long as a netrunner intrusion is active
+// — "the netrunner is doing damage," not a normal hijack spike, so this is
+// a chaotic jump between half-load and maxed out, not a steady near-ceiling
+// peg. Ticking BREACH_TICK_SPEEDUP times faster on top of that (see
+// _startCpuIdle/_startMemIdle/_makeGraph) is what actually sells "jumping
+// around quickly" instead of just "a wide but slow drift."
+const BREACH_LOAD_LOW_PCT = 50;
+const BREACH_LOAD_HIGH_PCT = 100;
+// Applies to CPU/MEM's own tick rate and (on top of their already-doubled
+// rate) the CGM graphs' — quadruple speed altogether during a breach.
+const BREACH_TICK_SPEEDUP = 4;
+// Glitch bursts (_scheduleGlitch) and the terminal (both its print pace
+// and the ambient-chatter cadence) run even faster still — double
+// BREACH_TICK_SPEEDUP on top of itself, not just matching it.
+const BREACH_FAST_SPEEDUP = BREACH_TICK_SPEEDUP * 2;
 const GLITCH_CHARS = '01<>[]/\\#%&$?';
 // Kept in sync with the CSS keyframes it toggles (cprTaHudJitter,
 // cprTaFlashPulse, cprTaTextGlitch) — dialed down from an original 420ms
@@ -44,10 +59,62 @@ const HUD_MAX_SCALE = 3; // sanity ceiling for an ultra-wide/very high-res canva
 const TEMP_BASE = 37.0;
 const TEMP_WARN = 39.4; // crossing this mid-climb is what flips rising -> cooling
 const TEMP_BAR_MAX = 42.0;
+// Where it pins — not cycling, not cooling back down — for as long as a
+// netrunner intrusion is live. Set to the real warning threshold itself,
+// so the reading is exactly what's already driving the alert rather than
+// a separate number that happens to look alarming.
+const BREACH_TEMP = TEMP_WARN;
 
 // ---- terminal window ----
 const TERMINAL_LINE_MS = 420; // pace between queued lines, ambient or take-control alike
-const TERMINAL_MAX_LINES = 6; // older lines are pruned once the box is full, not scrolled
+const TERMINAL_MAX_LINES = 9; // older lines are pruned once the box is full, not scrolled
+
+// How long an intrusion's input stays open with nobody typing the right
+// command before it's treated as unresolved — shared by every intrusion
+// kind below (netrunner, black ice, ...). Re-exported from each kind's
+// own trigger file would be circular (those files import visionEffect
+// already) — kept here since this is the side that actually owns the
+// countdown, and they read it back via INTRUSION_TIMEOUT_MS to know when
+// it's safe to trigger the next one.
+export const INTRUSION_TIMEOUT_MS = 90_000;
+
+// One "hostile presence" system drives every intrusion kind — same
+// breach flash/CPU-MEM chaos/jitter speedup/terminal speedup regardless
+// of which — only the wording (and, elsewhere, the resolving command and
+// name pool) actually differs per kind. Adding a new kind means adding an
+// entry here plus a BREACH_TERMINAL_LINES pool below; nothing about
+// startIntrusion()/resolveIntrusion()/_failIntrusion() needs to change.
+const INTRUSION_KINDS = {
+  netrunner: {
+    bannerLabel: 'HOSTILE NETRUNNER',
+    command: 'ECCM EVICT',
+    alertLine: (h) => `ENEMY NETRUNNER INTRUSION DETECTED. TO EVICT SESSION TRY 'ECCM EVICT ${h}'`,
+    resolvedLine: (h) => `INTRUSION FROM ${h} EVICTED. SESSION SECURE.`,
+    failedLine: (h) => `${h} CONNECTION LOST. INTRUSION UNRESOLVED.`,
+  },
+  blackice: {
+    bannerLabel: 'BLACK ICE',
+    command: 'SBIM ELIM',
+    alertLine: (h) => `BLACK ICE INTRUSION DETECTED. TO ELIMINATE TRY 'SBIM ELIM ${h}'`,
+    resolvedLine: (h) => `BLACK ICE ${h} ELIMINATED. SESSION SECURE.`,
+    failedLine: (h) => `${h} BREACHED DEFENSES. INTRUSION UNRESOLVED.`,
+  },
+  // The fourth kind: type unknown at first, presented as an unauthorized
+  // login alias (see unknown-intrusion.js) rather than a real handle —
+  // "find user -all" lists it alongside the rest of the roster, "find
+  // <alias>" pulls its actual Type/Login record. "resolvedLine" here is a
+  // fallback that shouldn't normally get hit — see revealIntrusion()
+  // below, which swaps this over to a real netrunner/blackice kind (with
+  // its own resolvedLine) the moment the login's identified, well before
+  // any eccm/sbim command could resolve it.
+  unknown: {
+    bannerLabel: 'UNIDENTIFIED SIGNAL',
+    command: null,
+    alertLine: (alias) => `UNAUTHORIZED USER DETECTED: ${alias}. RUN 'FIND USER -ALL' TO INVESTIGATE.`,
+    resolvedLine: (alias) => `USER ${alias} NEUTRALIZED.`,
+    failedLine: (alias) => `USER ${alias} LOST TRACE. INTRUSION UNRESOLVED.`,
+  },
+};
 
 // ---- boot sequence: the cinematic pre-roll mount() plays before the
 // persistent HUD above ever appears. Cold open (typed dialogue) -> logo
@@ -268,6 +335,44 @@ const AMBIENT_TERMINAL_LINES = [
   ['Mirae.', 'Mirae...', 'MIRAE...', 'MIRAE!', 'HEY MIRAE', "Keep your eyes open. I need you to keep going or else we are all dead."],
 ];
 
+// Epsilon yelling straight at Mirae once an intrusion is underway — mixed
+// in with AMBIENT_TERMINAL_LINES the rest of the time (see
+// _scheduleAmbientTerminal's BREACH_CHANCE): the AI has one thing on its
+// mind right now, on top of its usual background chatter. <HANDLE> gets
+// swapped for the live intrusion's handle, same substitution as the main
+// breach terminal line and the center banner. Keyed by intrusion kind
+// (see INTRUSION_KINDS) since the wording references the intruder type
+// by name, not just the handle.
+const BREACH_TERMINAL_LINES = {
+  netrunner: [
+    ['MIRAE DO SOMETHING.'],
+    ["LET'S GO MIRAE."],
+    ['WE NEED TO EVICT THE NETRUNNER.'],
+    ["ECCM EVICT <HANDLE>. C'MON"],
+    ["WE CAN'T KEEP THIS TOGETHER WITH A NETRUNNER ON OUR BACK."],
+    ['GET THIS DAMN NETRUNNER OFF OUR BACK! ECCM EVICT <HANDLE>.'],
+  ],
+  blackice: [
+    ['MIRAE DO SOMETHING.'],
+    ["LET'S GO MIRAE."],
+    ['WE NEED TO ELIMINATE THE BLACK ICE.'],
+    ["SBIM ELIM <HANDLE>. C'MON"],
+    ["WE CAN'T KEEP THIS TOGETHER WITH BLACK ICE ON OUR BACK."],
+    ['GET THIS DAMN ICE OFF OUR BACK! SBIM ELIM <HANDLE>.'],
+  ],
+  // <HANDLE> is the login alias here (e.g. "MCG"), not the real
+  // identity underneath it — Epsilon doesn't know who this actually is
+  // yet either, just that <HANDLE> shouldn't be on the user list.
+  unknown: [
+    ['MIRAE WE HAVE AN UNAUTHORIZED USER.'],
+    ['CHECK THE USER LIST, MIRAE.'],
+    ["WE CAN'T RESPOND UNTIL WE KNOW WHO THIS IS."],
+    ['<HANDLE> IS NOT ON THE ROSTER. FIND OUT WHO THEY ARE.'],
+    ["THIS ALIAS WON'T HOLD FOREVER, MIRAE."],
+    ['PULL THEIR RECORD NOW! FIND USER -ALL.'],
+  ],
+};
+
 function reduceMotion() {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
@@ -306,6 +411,23 @@ function getUiSafeMargins() {
   };
 }
 
+// ---- Terminal command registry: the growing list of recognized keywords
+// (eccm, sbim, find, sendmc, ...) live wherever their behavior actually
+// belongs — netrunner-intrusion.js registers "eccm" since evicting only
+// means anything alongside its own intrusion state, terminal-commands.js
+// registers the rest — rather than vision-effect.js hardcoding every
+// command itself. This file only owns matching a typed keyword to its
+// handler and the fallback when nothing matches; see
+// VisionEffect#_submitTerminalInput below. A handler receives (args, raw)
+// — args is the whitespace-split tail after the keyword, raw is the whole
+// typed line — and is responsible for printing its own response via
+// VisionEffect#printTerminalLine. ----
+const terminalCommands = new Map();
+
+export function registerTerminalCommand(keyword, handler) {
+  terminalCommands.set(keyword.toLowerCase(), handler);
+}
+
 export class VisionEffect {
   constructor() {
     this.el = null;
@@ -313,10 +435,14 @@ export class VisionEffect {
     this._safeEl = null;
     this._hudEl = null;
     this._counterEl = null;
+    this._breachBannerEl = null;
     this._chipEls = null;
     this._cpuFillEl = null;
     this._cpuValEl = null;
     this._cpuEl = null;
+    this._memFillEl = null;
+    this._memValEl = null;
+    this._memEl = null;
     this._thermalEl = null;
     this._thermalValEl = null;
     this._thermalBarEl = null;
@@ -330,6 +456,7 @@ export class VisionEffect {
     this._counterFrame = null;
     this._cpuTimer = null;
     this._cpuSpiking = false;
+    this._memTimer = null;
     this._glitchTimer = null;
     this._scrambleTimer = null;
     this._thermalTimer = null;
@@ -337,9 +464,17 @@ export class VisionEffect {
     this._thermalTarget = TEMP_BASE;
     this._temp = TEMP_BASE;
 
+    this._terminalStackEl = null;
+    this._terminalEl = null;
     this._terminalLinesEl = null;
+    this._terminalResultEl = null;
     this._terminalTimer = null;
     this._terminalQueue = [];
+    this._terminalInputRowEl = null;
+    this._terminalInputEl = null;
+    this._intrusionHandle = null;
+    this._intrusionKind = null;
+    this._intrusionTimer = null;
     this._ambientTimer = null;
 
     this._bootEl = null;
@@ -413,6 +548,7 @@ export class VisionEffect {
 
     this._startCounter();
     this._startCpuIdle();
+    this._startMemIdle();
     this._startThermal();
     this._graphC.start();
     this._graphR.start();
@@ -428,6 +564,7 @@ export class VisionEffect {
     this._resizeObserver = null;
     this._stopCounter();
     this._stopCpuIdle();
+    this._stopMemIdle();
     this._stopThermal();
     this._graphC?.stop();
     this._graphR?.stop();
@@ -438,6 +575,10 @@ export class VisionEffect {
     if (this._terminalTimer) clearTimeout(this._terminalTimer);
     this._terminalTimer = null;
     this._terminalQueue = [];
+    if (this._intrusionTimer) clearTimeout(this._intrusionTimer);
+    this._intrusionTimer = null;
+    this._intrusionHandle = null;
+    this._intrusionKind = null;
     this._stopAmbientTerminal();
     this._stopBootTimers();
     this._clearPopups();
@@ -480,18 +621,38 @@ export class VisionEffect {
           <div class="cpr-twins-ai-signal-bar"><i></i></div>
         </div>
 
-        <div class="cpr-twins-ai-cpu" data-cpu>
-          <span class="cpr-twins-ai-cpu-label">CPU</span>
-          <div class="cpr-twins-ai-cpu-track">
-            <div class="cpr-twins-ai-cpu-fill" data-cpu-fill>
-              <div class="cpr-twins-ai-cpu-fill-gradient"></div>
+        <div class="cpr-twins-ai-cpu-mem-row" data-cpu-mem-row>
+          <div class="cpr-twins-ai-cpu" data-cpu>
+            <span class="cpr-twins-ai-cpu-label">CPU</span>
+            <div class="cpr-twins-ai-cpu-track">
+              <div class="cpr-twins-ai-cpu-fill" data-cpu-fill>
+                <div class="cpr-twins-ai-cpu-fill-gradient"></div>
+              </div>
             </div>
+            <span class="cpr-twins-ai-cpu-val" data-cpu-val>4%</span>
           </div>
-          <span class="cpr-twins-ai-cpu-val" data-cpu-val>4%</span>
+
+          <div class="cpr-twins-ai-mem" data-mem>
+            <span class="cpr-twins-ai-mem-label">MEM</span>
+            <div class="cpr-twins-ai-mem-track">
+              <div class="cpr-twins-ai-mem-fill" data-mem-fill>
+                <div class="cpr-twins-ai-mem-fill-gradient"></div>
+              </div>
+            </div>
+            <span class="cpr-twins-ai-mem-val" data-mem-val>4%</span>
+          </div>
         </div>
 
-        <div class="cpr-twins-ai-terminal">
-          <div class="cpr-twins-ai-terminal-lines" data-terminal></div>
+        <div class="cpr-twins-ai-terminal-stack" data-terminal-stack>
+          <div class="cpr-twins-ai-terminal" data-terminal-root>
+            <div class="cpr-twins-ai-terminal-lines" data-terminal></div>
+          </div>
+          <div class="cpr-twins-ai-terminal-result" data-terminal-result></div>
+          <div class="cpr-twins-ai-terminal-input-row" data-terminal-input-row>
+            <span class="cpr-twins-ai-terminal-input-prompt">&gt;</span>
+            <input type="text" class="cpr-twins-ai-terminal-input" data-terminal-input
+              autocomplete="off" spellcheck="false">
+          </div>
         </div>
 
         <div class="cpr-twins-ai-telemetry">
@@ -521,10 +682,22 @@ export class VisionEffect {
           </div>
         </div>
 
+        <div class="cpr-twins-ai-command-ref">
+          <span class="cpr-twins-ai-command-ref-item">eccm evict &lt;username&gt;</span>
+          <span class="cpr-twins-ai-command-ref-item">eccm flush cache</span>
+          <span class="cpr-twins-ai-command-ref-item">sbim elim -all</span>
+          <span class="cpr-twins-ai-command-ref-item">find user -all</span>
+          <span class="cpr-twins-ai-command-ref-item">find &lt;string&gt;</span>
+          <span class="cpr-twins-ai-command-ref-item">sendmc &lt;message&gt;</span>
+        </div>
+
         <div class="cpr-twins-ai-watermark">ADVANCED TELEMETRY DATA VIA NEARBY CAMERA FEEDS, WIRELESS DEVICES, AND SENSORS</div>
       </div>
       </div>
       <div class="cpr-twins-ai-vhs-line"></div>
+
+      <div class="cpr-twins-ai-breach-flash"></div>
+      <div class="cpr-twins-ai-breach-banner" data-breach-banner></div>
 
       <div class="cpr-twins-ai-boot" data-boot>
         <div class="cpr-twins-ai-boot-popup-layer" data-boot-popup-layer></div>
@@ -547,12 +720,24 @@ export class VisionEffect {
     this._safeEl = root.querySelector('.cpr-twins-ai-safe');
     this._hudEl = root.querySelector('.cpr-twins-ai-hud');
     this._counterEl = root.querySelector('[data-counter]');
+    this._breachBannerEl = root.querySelector('[data-breach-banner]');
+    this._terminalStackEl = root.querySelector('[data-terminal-stack]');
+    this._terminalEl = root.querySelector('[data-terminal-root]');
     this._terminalLinesEl = root.querySelector('[data-terminal]');
+    this._terminalResultEl = root.querySelector('[data-terminal-result]');
+    this._terminalInputRowEl = root.querySelector('[data-terminal-input-row]');
+    this._terminalInputEl = root.querySelector('[data-terminal-input]');
+    this._terminalInputEl.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter') this._submitTerminalInput();
+    });
     this._targetsEl = root.querySelector('.cpr-twins-ai-targets');
     this._chipEls = root.querySelectorAll('.cpr-twins-ai-chip');
     this._cpuEl = root.querySelector('[data-cpu]');
     this._cpuFillEl = root.querySelector('[data-cpu-fill]');
     this._cpuValEl = root.querySelector('[data-cpu-val]');
+    this._memEl = root.querySelector('[data-mem]');
+    this._memFillEl = root.querySelector('[data-mem-fill]');
+    this._memValEl = root.querySelector('[data-mem-val]');
     this._thermalEl = root.querySelector('[data-thermal]');
     this._thermalValEl = root.querySelector('[data-thermal-val]');
     this._thermalBarEl = root.querySelector('[data-thermal-bar]');
@@ -845,10 +1030,21 @@ export class VisionEffect {
     this._counterFrame = null;
   }
 
+  /** Chaotic half-load-to-maxed reading used by both CPU and MEM for as long as a netrunner intrusion is active. */
+  _breachLoadValue() {
+    return BREACH_LOAD_LOW_PCT + Math.random() * (BREACH_LOAD_HIGH_PCT - BREACH_LOAD_LOW_PCT);
+  }
+
   // ---- CPU meter: idle floor rises 10% per active link (so the meter
   // itself telegraphs "5 is the ceiling" — a full board rests near 52%,
   // and a spike off that lands close to max), with a +40%-over-floor
-  // spike held briefly on every hijack before easing back down. ----
+  // spike held briefly on every hijack before easing back down. Swings
+  // wildly between BREACH_LOAD_LOW_PCT and _HIGH_PCT instead of any of
+  // that, at BREACH_TICK_SPEEDUP times the normal tick rate, for as long
+  // as a netrunner intrusion is live — see _breachLoadValue(). Self-
+  // rescheduling (setTimeout, not setInterval) so that speedup can kick in
+  // and drop away immediately rather than waiting for a fixed interval to
+  // be torn down and rebuilt. ----
 
   _setCpu(pct) {
     const clamped = Math.max(0, Math.min(pct, 100));
@@ -865,14 +1061,18 @@ export class VisionEffect {
   _startCpuIdle() {
     this._setCpu(this._cpuFloor());
     if (reduceMotion()) return;
-    this._cpuTimer = setInterval(() => {
-      if (this._cpuSpiking) return;
-      this._setCpu(this._cpuFloor() + Math.random() * 6);
-    }, 450 + Math.random() * 250);
+    const tick = () => {
+      if (!this._cpuSpiking) {
+        this._setCpu(this.intruding ? this._breachLoadValue() : this._cpuFloor() + Math.random() * 6);
+      }
+      const delay = 450 + Math.random() * 250;
+      this._cpuTimer = window.setTimeout(tick, this.intruding ? delay / BREACH_TICK_SPEEDUP : delay);
+    };
+    this._cpuTimer = window.setTimeout(tick, 450 + Math.random() * 250);
   }
 
   _stopCpuIdle() {
-    if (this._cpuTimer) clearInterval(this._cpuTimer);
+    if (this._cpuTimer) clearTimeout(this._cpuTimer);
     this._cpuTimer = null;
     this._cpuSpiking = false;
     this._cpuEl?.classList.remove('cpr-twins-ai-cpu--spiking');
@@ -913,20 +1113,58 @@ export class VisionEffect {
     }, 180);
   }
 
+  // ---- MEM meter: same shape as the CPU one right next to it, but its own
+  // independent idle reading — memory pressure isn't driven by how many
+  // links are active the way CPU load is, just a gentle low-level drift.
+  // Swings wildly at BREACH_TICK_SPEEDUP times the normal rate during a
+  // netrunner intrusion exactly like CPU does. ----
+
+  _setMem(pct) {
+    const clamped = Math.max(0, Math.min(pct, 100));
+    this._memFillEl.style.height = `${clamped}%`;
+    this._memValEl.textContent = `${Math.round(clamped)}%`;
+    this._memEl?.classList.toggle('cpr-twins-ai-mem--critical', clamped >= CPU_CRITICAL_PCT);
+  }
+
+  _startMemIdle() {
+    this._setMem(18);
+    if (reduceMotion()) return;
+    const tick = () => {
+      this._setMem(this.intruding ? this._breachLoadValue() : 14 + Math.random() * 12);
+      const delay = 500 + Math.random() * 300;
+      this._memTimer = window.setTimeout(tick, this.intruding ? delay / BREACH_TICK_SPEEDUP : delay);
+    };
+    this._memTimer = window.setTimeout(tick, 500 + Math.random() * 300);
+  }
+
+  _stopMemIdle() {
+    if (this._memTimer) clearTimeout(this._memTimer);
+    this._memTimer = null;
+  }
+
   // ---- BIO TEMP: idles near 37.0°C, occasionally climbs, and the moment
   // it crosses TEMP_WARN mid-climb the AI visibly throttles itself back
   // down to baseline before the cycle is free to fire again — not on a
   // fixed timer, so it won't feel metronomic across a session. ----
 
-  _setTemp(v) {
+  _setTemp(v, { forceWarm = false } = {}) {
     this._temp = v;
     if (this._thermalValEl) this._thermalValEl.textContent = `${v.toFixed(1)}°C`;
     const pct = Math.max(0, Math.min(100, ((v - 36.4) / (TEMP_BAR_MAX - 36.4)) * 100));
     if (this._thermalBarEl) this._thermalBarEl.style.width = `${pct}%`;
-    this._thermalEl?.classList.toggle('cpr-twins-ai-vital--warm', v >= TEMP_WARN);
+    this._thermalEl?.classList.toggle('cpr-twins-ai-vital--warm', forceWarm || v >= TEMP_WARN);
   }
 
   _thermalTick() {
+    // Pinned for as long as the intrusion is live — the state machine
+    // below just doesn't run at all while this is true, so whatever state
+    // it was mid-cycle in when the breach started is exactly where it
+    // resumes once _endIntrusion() lets this fall through again.
+    if (this.intruding) {
+      this._setTemp(BREACH_TEMP, { forceWarm: true });
+      this._thermalWarningEl?.classList.add('show');
+      return;
+    }
     if (this._thermalState === 'idle') {
       this._setTemp(TEMP_BASE + (Math.random() * 0.5 - 0.25));
       if (Math.random() < 0.045) {
@@ -988,6 +1226,11 @@ export class VisionEffect {
         ctx.fillRect(i * bw + 1, cssH - h, Math.max(1, bw - 2), h);
       });
     };
+    // Self-rescheduling instead of a plain setInterval so the cadence can
+    // change on the fly: a netrunner intrusion runs this at
+    // BREACH_TICK_SPEEDUP times the rate (dividing the delay) for as long
+    // as this.intruding stays true, no separate start/stop swap needed
+    // when a breach begins or ends.
     const tick = () => {
       let v = min + Math.random() * (max - min) * 0.55;
       if (Math.random() < spikeChance) v = max * (0.75 + Math.random() * 0.25);
@@ -995,10 +1238,13 @@ export class VisionEffect {
       samples.push(v);
       draw();
       valEl.textContent = `${v.toFixed(decimals)} ${unit}`;
+      if (reduceMotion()) return;
+      const delay = (260 + Math.random() * 120) / (this.intruding ? BREACH_TICK_SPEEDUP : 1);
+      timer = window.setTimeout(tick, delay);
     };
     return {
-      start() { tick(); if (!reduceMotion()) timer = window.setInterval(tick, 260 + Math.random() * 120); },
-      stop() { if (timer) clearInterval(timer); timer = null; },
+      start: () => tick(),
+      stop: () => { if (timer) clearTimeout(timer); timer = null; },
     };
   }
 
@@ -1011,11 +1257,19 @@ export class VisionEffect {
 
   _scheduleGlitch() {
     if (reduceMotion()) return;
+    // BREACH_FAST_SPEEDUP (faster than CPU/MEM/the CGM graphs' own
+    // BREACH_TICK_SPEEDUP) applied to the gap between bursts — the shake
+    // itself is also stronger during a breach, see cprTaHudJitterBreach in
+    // twins-ai.css. Recomputed on every fire() so a breach starting or
+    // ending mid-cycle takes effect on the very next burst, same
+    // one-tick-of-lag tradeoff as everywhere else this pattern's used.
     const fire = () => {
+      const baseDelay = 3200 + Math.random() * 4800;
+      const delay = this.intruding ? baseDelay / BREACH_FAST_SPEEDUP : baseDelay;
       this._glitchTimer = window.setTimeout(() => {
         this._pulseGlitch();
         fire();
-      }, 3200 + Math.random() * 4800);
+      }, delay);
     };
     fire();
   }
@@ -1057,9 +1311,17 @@ export class VisionEffect {
   // script. Take-control lines print in --action styling (ink-white) so
   // they read as distinct from the ambient green background noise. ----
 
-  _terminalEnqueue(lines, { action = false } = {}) {
+  /**
+   * `urgent` unshifts instead of pushing — used for netrunner-intrusion
+   * alerts, so a red warning plays next rather than waiting behind
+   * whatever ambient chatter (or a take-control script) is already queued.
+   * It doesn't clear the rest of the queue, just cuts the line.
+   */
+  _terminalEnqueue(lines, { action = false, danger = false, urgent = false } = {}) {
     if (!this._terminalLinesEl) return;
-    for (const text of lines) this._terminalQueue.push({ text, action });
+    const entries = lines.map((text) => ({ text, action, danger }));
+    if (urgent) this._terminalQueue.unshift(...entries);
+    else this._terminalQueue.push(...entries);
     this._terminalPump();
   }
 
@@ -1069,17 +1331,237 @@ export class VisionEffect {
     if (!line) return;
 
     const row = document.createElement('div');
-    row.className = `cpr-twins-ai-terminal-line${line.action ? ' cpr-twins-ai-terminal-line--action' : ''}`;
+    row.className = `cpr-twins-ai-terminal-line${line.action ? ' cpr-twins-ai-terminal-line--action' : ''}${line.danger ? ' cpr-twins-ai-terminal-line--danger' : ''}`;
     row.textContent = `> ${line.text}`;
     this._terminalLinesEl.appendChild(row);
     while (this._terminalLinesEl.children.length > TERMINAL_MAX_LINES) {
       this._terminalLinesEl.removeChild(this._terminalLinesEl.firstChild);
     }
 
+    // Prints (and the ambient chatter feeding it — see
+    // _scheduleAmbientTerminal) at BREACH_FAST_SPEEDUP times the normal
+    // pace for as long as an intrusion's live — the log itself should feel
+    // like it's scrolling faster under the strain, faster even than
+    // CPU/MEM/the graphs.
+    const delay = this.intruding ? TERMINAL_LINE_MS / BREACH_FAST_SPEEDUP : TERMINAL_LINE_MS;
     this._terminalTimer = window.setTimeout(() => {
       this._terminalTimer = null;
       this._terminalPump();
-    }, TERMINAL_LINE_MS);
+    }, delay);
+  }
+
+  // ---- Intrusions: the "hostile presence" event family — netrunner was
+  // the first entry, black ice the second, more meant to follow (see
+  // INTRUSION_KINDS up top for what actually varies per kind). When and
+  // whether one happens, and keeping every client in sync about it, is
+  // each kind's own trigger file's job (netrunner-intrusion.js,
+  // blackice-intrusion.js); this is just the terminal-side presentation,
+  // plus validating a typed attempt locally — a wrong guess is only this
+  // client's business, so it doesn't need to round-trip anywhere, only a
+  // genuine solve does (see _submitTerminalInput). The input row itself
+  // isn't intrusion-only — it's live the whole time the HUD is up (see
+  // _submitTerminalInput), an intrusion just gives it something real to
+  // check typed input against. ----
+
+  /** True while this client has an unresolved intrusion showing. Guards against a second start() landing on top of an already-active one. */
+  get intruding() {
+    return !!this._intrusionHandle;
+  }
+
+  /** The active intrusion's handle (e.g. "GHOSTWIRE"), or null — what each kind's own terminal-command handler checks a typed target against. */
+  get intrusionHandle() {
+    return this._intrusionHandle;
+  }
+
+  /** The active intrusion's kind ("netrunner", "blackice", ...), or null. */
+  get intrusionKind() {
+    return this._intrusionKind;
+  }
+
+  /** Public print for terminal-command handlers registered elsewhere (see registerTerminalCommand above) — same urgent/styled line any built-in response uses. */
+  printTerminalLine(text, opts = {}) {
+    this.printTerminalLines([text], opts);
+  }
+
+  /**
+   * Same as printTerminalLine, for a whole block that has to print as one
+   * unit in order — e.g. unknown-intrusion.js's user listing or its
+   * User/Type/Login reveal. Matters because `urgent` unshifts to the
+   * front of the queue: calling printTerminalLine several times in a row
+   * for what's meant to be one ordered block would print it backwards
+   * (each call's single line jumps ahead of the previous call's), since
+   * every call is its own separate unshift.
+   */
+  printTerminalLines(lines, { danger = false, action = false } = {}) {
+    this._terminalEnqueue(lines, { danger, action, urgent: true });
+    this._setTerminalResult(lines, { danger, action });
+  }
+
+  /**
+   * Mirrors a command's response into a second, non-scrolling readout
+   * pinned between the log and the input row — the scrolling log alone
+   * wasn't enough to actually read a multi-line result like "find user
+   * -all"'s roster or the unknown-intrusion reveal: ambient chatter (and,
+   * during a breach, everything running at BREACH_FAST_SPEEDUP) pushes
+   * TERMINAL_MAX_LINES-worth of history past in a couple of seconds. This
+   * doesn't scroll or prune — it just holds whatever the last command
+   * said until the next one overwrites it, so there's always somewhere to
+   * actually read the answer regardless of how fast the log itself is
+   * moving. Deliberately only reachable through printTerminalLine(s) —
+   * ambient chatter and Epsilon's yelling go through _terminalEnqueue
+   * directly and never touch this, so idle background noise can't bump a
+   * real answer off it.
+   */
+  _setTerminalResult(lines, { danger = false, action = false } = {}) {
+    if (!this._terminalResultEl) return;
+    this._terminalResultEl.innerHTML = '';
+    for (const text of lines) {
+      const row = document.createElement('div');
+      row.className = `cpr-twins-ai-terminal-line${action ? ' cpr-twins-ai-terminal-line--action' : ''}${danger ? ' cpr-twins-ai-terminal-line--danger' : ''}`;
+      row.textContent = `> ${text}`;
+      this._terminalResultEl.appendChild(row);
+    }
+    this._terminalResultEl.classList.add('show');
+  }
+
+  /** `kind` must be a key in INTRUSION_KINDS (defaults to "netrunner" for the original caller/tests that predate the second kind). */
+  startIntrusion(handle, kind = 'netrunner') {
+    if (!this.el || this._bootActive || this._intrusionHandle) return;
+    const info = INTRUSION_KINDS[kind] ?? INTRUSION_KINDS.netrunner;
+    this._intrusionHandle = handle;
+    this._intrusionKind = kind;
+    this._terminalStackEl?.classList.add('cpr-twins-ai-terminal--intrusion');
+    // The whole-screen red flash + center SECURITY BREACH banner (see
+    // twins-ai.css) — deliberately louder than the terminal's own red
+    // line, since this needs to grab the whole table's attention, not
+    // just whoever's already looking at the terminal box.
+    this.el.classList.add('cpr-twins-ai-vision--breach');
+    // CPU/MEM/BIO TEMP jump to their pegged breach readings immediately
+    // instead of waiting on their own idle timers to happen to tick next —
+    // this should read as instantaneous, the moment the breach starts, not
+    // a gradual climb. Their timers keep running and re-peg the same way
+    // on every subsequent tick for as long as this.intruding stays true.
+    // (No need to also toggle --spiking here: a 96-100% reading is always
+    // above CPU_CRITICAL_PCT, and --critical's red styling already wins
+    // over --spiking's green one on every property they share.)
+    this._setCpu(this._breachLoadValue());
+    this._setMem(this._breachLoadValue());
+    this._setTemp(BREACH_TEMP, { forceWarm: true });
+    this._thermalWarningEl?.classList.add('show');
+    // Also fire a glitch burst (shake/flash/scrambled readout) right now
+    // instead of waiting on whatever's left of _scheduleGlitch()'s current
+    // gap, which could still have several seconds left on it — the
+    // connection struggling to hold together should read as instantaneous
+    // the moment the breach starts, same as CPU/MEM/BIO TEMP above.
+    // _scheduleGlitch() itself already checks this before ever calling
+    // _pulseGlitch(), so this direct call needs its own guard too.
+    if (!reduceMotion()) this._pulseGlitch();
+    // The handle goes in the banner too, not just the terminal line —
+    // whoever's watching the screen instead of the terminal box still
+    // needs to know who to evict/eliminate.
+    if (this._breachBannerEl) {
+      this._breachBannerEl.textContent = `SECURITY BREACH: ${info.bannerLabel} ${handle.toUpperCase()}`;
+    }
+    this._terminalEnqueue([info.alertLine(handle.toUpperCase())], { danger: true, urgent: true });
+    this._intrusionTimer = window.setTimeout(() => this._failIntrusion(), INTRUSION_TIMEOUT_MS);
+    // overlay.js listens for this to start the token outlines' own erratic
+    // flicker — the same "connection struggling" read, extended to the
+    // one part of the screen this file doesn't own.
+    Hooks.callAll(`${MODULE_ID}.intrusionStart`, handle, kind);
+  }
+
+  /**
+   * Called once unknown-intrusion.js's table-wide reveal broadcast lands
+   * (see its own tryHandleFind()) — swaps a running "unknown" intrusion
+   * over to its real kind+handle in place, without interrupting the timer
+   * or any breach visual already running (CPU/MEM, jitter, the chrome
+   * blur — none of that is kind-specific, so none of it needs restarting).
+   * From this point on eccm/sbim's own existing kind-gated resolution
+   * logic just works unmodified, since this._intrusionKind now holds a
+   * real kind instead of "unknown". Only updates the banner — the actual
+   * User/Type/Login reveal is printed by unknown-intrusion.js itself
+   * (it's the one that knows the alias and the record's wording), right
+   * alongside this call.
+   */
+  revealIntrusion(realHandle, realKind) {
+    if (this._intrusionKind !== 'unknown') return;
+    const info = INTRUSION_KINDS[realKind] ?? INTRUSION_KINDS.netrunner;
+    this._intrusionHandle = realHandle;
+    this._intrusionKind = realKind;
+    if (this._breachBannerEl) {
+      this._breachBannerEl.textContent = `SECURITY BREACH: ${info.bannerLabel} ${realHandle.toUpperCase()}`;
+    }
+  }
+
+  /** Called once the table-wide resolve broadcast lands — including on whichever client actually solved it, so there's exactly one code path that clears the alert. */
+  resolveIntrusion() {
+    if (!this._intrusionHandle) return;
+    const handle = this._intrusionHandle;
+    const info = INTRUSION_KINDS[this._intrusionKind] ?? INTRUSION_KINDS.netrunner;
+    this._endIntrusion();
+    this._terminalEnqueue([info.resolvedLine(handle.toUpperCase())], { action: true, urgent: true });
+  }
+
+  _failIntrusion() {
+    if (!this._intrusionHandle) return;
+    const handle = this._intrusionHandle;
+    const info = INTRUSION_KINDS[this._intrusionKind] ?? INTRUSION_KINDS.netrunner;
+    this._endIntrusion();
+    this._terminalEnqueue([info.failedLine(handle.toUpperCase())], { danger: true, urgent: true });
+  }
+
+  _endIntrusion() {
+    if (this._intrusionTimer) {
+      clearTimeout(this._intrusionTimer);
+      this._intrusionTimer = null;
+    }
+    this._intrusionHandle = null;
+    this._intrusionKind = null;
+    this._terminalStackEl?.classList.remove('cpr-twins-ai-terminal--intrusion');
+    this.el?.classList.remove('cpr-twins-ai-vision--breach');
+    if (this._breachBannerEl) this._breachBannerEl.textContent = '';
+    // Same instant-reset treatment as startIntrusion()'s instant pin —
+    // drops straight back to normal rather than waiting on the idle
+    // timers' next tick or the thermal state machine's own cooldown pace.
+    this._setCpu(this._cpuFloor());
+    this._setMem(14 + Math.random() * 12);
+    this._thermalState = 'idle';
+    this._thermalWarningEl?.classList.remove('show');
+    this._setTemp(TEMP_BASE);
+    // Covers both resolveIntrusion() and _failIntrusion(), which both
+    // route through here — the outlines' erratic flicker stops the same
+    // instant everything else above does, regardless of which one ended it.
+    Hooks.callAll(`${MODULE_ID}.intrusionEnd`);
+  }
+
+  /**
+   * Enter in the input box — live for as long as the HUD is up, not just
+   * during an intrusion. Whatever's typed always echoes into the terminal
+   * log first, same as any other line (and ages out the same way once it
+   * scrolls past TERMINAL_MAX_LINES) — a real terminal shows what you
+   * typed whether or not it meant anything. The first word is then looked
+   * up in the terminalCommands registry above: a recognized keyword's own
+   * handler takes it from there (e.g. netrunner-intrusion.js's "eccm",
+   * checked against whatever intrusion is currently active, if any), and
+   * anything else — a typo, plain chatter, a command with no active use
+   * right now — gets the same blunt response a real restricted terminal
+   * would give.
+   */
+  _submitTerminalInput() {
+    if (!this._terminalInputEl) return;
+    const raw = this._terminalInputEl.value.trim();
+    this._terminalInputEl.value = '';
+    if (!raw) return;
+
+    this._terminalEnqueue([raw], { urgent: true });
+
+    const [keyword, ...args] = raw.split(/\s+/);
+    const handler = terminalCommands.get(keyword.toLowerCase());
+    if (!handler) {
+      this.printTerminalLine('COMMAND NOT RECOGNIZED.', { danger: true });
+      return;
+    }
+    handler(args, raw);
   }
 
   /**
@@ -1104,12 +1586,27 @@ export class VisionEffect {
 
   _scheduleAmbientTerminal() {
     if (reduceMotion()) return;
+    // Same BREACH_FAST_SPEEDUP as the terminal's own print pace, applied
+    // to the gap between lines — plus, while it's live, a minority of
+    // lines are Epsilon yelling straight at Mirae (see BREACH_CHANCE
+    // below) mixed in with the usual idle background chatter, which keeps
+    // flowing the rest of the time rather than being replaced outright.
+    const BREACH_CHANCE = 0.25;
     const fire = () => {
+      const baseDelay = 2600 + Math.random() * 3800;
+      const delay = this.intruding ? baseDelay / BREACH_FAST_SPEEDUP : baseDelay;
       this._ambientTimer = window.setTimeout(() => {
-        const entry = AMBIENT_TERMINAL_LINES[Math.floor(Math.random() * AMBIENT_TERMINAL_LINES.length)];
-        this._terminalEnqueue(entry);
+        if (this.intruding && Math.random() < BREACH_CHANCE) {
+          const pool = BREACH_TERMINAL_LINES[this._intrusionKind] ?? BREACH_TERMINAL_LINES.netrunner;
+          const entry = pool[Math.floor(Math.random() * pool.length)]
+            .map((text) => text.replace('<HANDLE>', (this._intrusionHandle ?? '').toUpperCase()));
+          this._terminalEnqueue(entry, { danger: true });
+        } else {
+          const entry = AMBIENT_TERMINAL_LINES[Math.floor(Math.random() * AMBIENT_TERMINAL_LINES.length)];
+          this._terminalEnqueue(entry);
+        }
         fire();
-      }, 2600 + Math.random() * 3800);
+      }, delay);
     };
     fire();
   }
@@ -1119,13 +1616,22 @@ export class VisionEffect {
     this._ambientTimer = null;
   }
 
-  // ---- Active Links: 5 chips, filled by how many tokens on this scene are currently claimed ----
+  // ---- Active Links: 5 chips, filled by how many tokens on this scene are
+  // currently claimed — the last one shows locked instead while the cache
+  // is corrupted (see cache-corruption.js), since effectiveMaxActiveLinks()
+  // is what grantControl() is actually enforcing at that point, not the
+  // raw ceiling this row is normally drawn against. ----
 
   refreshChips() {
     if (!this.el) return;
-    const count = Math.min(claimedTokensOnScene().length, this._chipEls.length);
-    this._chipEls.forEach((chip, i) => chip.classList.toggle('cpr-twins-ai-chip--filled', i < count));
-    this._targetsEl?.classList.toggle('cpr-twins-ai-targets--maxed', count >= MAX_CHIPS);
+    const corrupted = isCacheCorrupted();
+    const lockedIndex = corrupted ? this._chipEls.length - 1 : -1;
+    const count = Math.min(claimedTokensOnScene().length, this._chipEls.length - (corrupted ? 1 : 0));
+    this._chipEls.forEach((chip, i) => {
+      chip.classList.toggle('cpr-twins-ai-chip--locked', i === lockedIndex);
+      chip.classList.toggle('cpr-twins-ai-chip--filled', i !== lockedIndex && i < count);
+    });
+    this._targetsEl?.classList.toggle('cpr-twins-ai-targets--maxed', count >= MAX_CHIPS - (corrupted ? 1 : 0));
   }
 
   // ---- Hijack flourish: camera settles on the target, its own art

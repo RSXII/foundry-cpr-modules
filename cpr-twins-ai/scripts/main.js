@@ -2,6 +2,12 @@ import { MODULE_ID, isModeEnabled } from './data.js';
 import { registerSheetInjectorHooks } from './sheet-injector.js';
 import { registerOverlayHooks } from './overlay.js';
 import { registerSocketHooks } from './socket.js';
+import { registerIntrusionHooks, triggerIntrusion } from './netrunner-intrusion.js';
+import { registerBlackIceIntrusionHooks, triggerBlackIceIntrusion } from './blackice-intrusion.js';
+import { registerCacheCorruptionHooks, triggerCacheCorruption } from './cache-corruption.js';
+import { registerUnknownIntrusionHooks, triggerUnknownIntrusion } from './unknown-intrusion.js';
+import { registerBuiltinTerminalCommands } from './terminal-commands.js';
+import { registerChromeEffectHooks } from './chrome-effects.js';
 import { visionEffect } from './vision-effect.js';
 
 const CONTROL_LAYER_NAME = 'cprTwinsAiLayer';
@@ -22,6 +28,16 @@ Hooks.once('init', () => {
   game.settings.register(MODULE_ID, 'modeEnabled', {
     name: 'Allow players to take control of eligible tokens',
     hint: 'While on, players see a "Take Control" prompt above tokens flagged Player-Takeable on their actor sheet, and every connected client gets the Rogue AI Vision screen effect.',
+    scope: 'world',
+    config: false,
+    type: Boolean,
+    default: false,
+  });
+
+  // World-scoped like modeEnabled, for the same reason: every client needs
+  // to agree on this without a relay message, and Foundry already syncs a
+  // world setting's changes to everyone on its own. See cache-corruption.js.
+  game.settings.register(MODULE_ID, 'cacheCorrupted', {
     scope: 'world',
     config: false,
     type: Boolean,
@@ -54,6 +70,12 @@ Hooks.once('init', () => {
   registerSheetInjectorHooks();
   registerOverlayHooks();
   registerSocketHooks();
+  registerIntrusionHooks();
+  registerBlackIceIntrusionHooks();
+  registerCacheCorruptionHooks();
+  registerUnknownIntrusionHooks();
+  registerBuiltinTerminalCommands();
+  registerChromeEffectHooks();
 });
 
 // Mounts/tears down the full-screen vision effect to match the setting —
@@ -110,6 +132,38 @@ Hooks.on('getSceneControlButtons', (controls) => {
         toggle: true,
         active: isModeEnabled(),
         onClick: (active) => game.settings.set(MODULE_ID, 'modeEnabled', active),
+      },
+      // Momentary action, not a toggle (button:true, no active/state) — the
+      // GM picking the moment themselves, on purpose, replacing what used
+      // to be a random timer. triggerIntrusion() itself no-ops with a
+      // warning if the mode's off or one's already running.
+      {
+        name: 'trigger-intrusion',
+        title: 'Trigger Netrunner Intrusion',
+        icon: 'fa-solid fa-user-secret',
+        button: true,
+        onClick: () => triggerIntrusion(),
+      },
+      {
+        name: 'trigger-blackice',
+        title: 'Trigger Black Ice Intrusion',
+        icon: 'fa-solid fa-shield-halved',
+        button: true,
+        onClick: () => triggerBlackIceIntrusion(),
+      },
+      {
+        name: 'trigger-cache-corruption',
+        title: 'Trigger Cache Corruption',
+        icon: 'fa-solid fa-microchip',
+        button: true,
+        onClick: () => triggerCacheCorruption(),
+      },
+      {
+        name: 'trigger-unknown',
+        title: 'Trigger Unknown Intrusion',
+        icon: 'fa-solid fa-circle-question',
+        button: true,
+        onClick: () => triggerUnknownIntrusion(),
       },
     ],
   };

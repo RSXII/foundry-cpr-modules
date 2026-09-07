@@ -174,6 +174,32 @@
 .cpr-twins-ai-vision--jitter .cpr-twins-ai-flash { animation: cprTaFlashPulse 0.12s ease-out; }
 @keyframes cprTaFlashPulse { 0% { opacity: 0.55; } 100% { opacity: 0; } }
 
+/* Netrunner intrusion: a harder hit than the normal burst above — roughly
+   double the shake amplitude and a brighter flash peak — on top of
+   _scheduleGlitch() already firing these bursts faster during a breach
+   (see BREACH_FAST_SPEEDUP in vision-effect.js). Both classes are
+   required on the selector so this outranks the plain --jitter rules
+   above by specificity regardless of source order, same technique as
+   .cpr-twins-ai-vision--poweron. */
+@keyframes cprTaHudJitterBreach {
+  0% { transform: translate(0, 0); }
+  10% { transform: translate(-11px, 4px); }
+  22% { transform: translate(9px, -5px); }
+  34% { transform: translate(-7px, 2px); }
+  46% { transform: translate(5px, -2px); }
+  58%, 100% { transform: translate(0, 0); }
+}
+
+.cpr-twins-ai-vision--jitter.cpr-twins-ai-vision--breach .cpr-twins-ai-safe {
+  animation: cprTaHudJitterBreach 0.12s steps(2, end);
+}
+
+.cpr-twins-ai-vision--jitter.cpr-twins-ai-vision--breach .cpr-twins-ai-flash {
+  animation: cprTaFlashPulseBreach 0.12s ease-out;
+}
+
+@keyframes cprTaFlashPulseBreach { 0% { opacity: 0.8; } 100% { opacity: 0; } }
+
 /* RGB-split flicker on the two live text readouts during a burst — cheap
    (text-shadow, no duplicated DOM) chromatic aberration that sells "the
    signal itself is glitching," not just "the frame shook." */
@@ -539,6 +565,22 @@
   background: repeating-linear-gradient(to right, var(--cpr-ta-accent) 0 2px, transparent 2px 4px);
 }
 
+/* Cache corruption (see cache-corruption.js): one slot taken out of
+   rotation entirely rather than counted as claimed or free — a hazard
+   stripe instead of the solid fill/empty states, so it reads as "off
+   limits," not just "the count changed." Restored by refreshChips()
+   dropping this class the instant effectiveMaxActiveLinks() is back to
+   the full ceiling (see data.js). */
+.cpr-twins-ai-chip--locked {
+  background: repeating-linear-gradient(45deg, rgba(255, 61, 94, 0.4) 0 3px, rgba(14, 26, 20, 0.9) 3px 6px);
+  border-color: var(--cpr-ta-danger);
+  box-shadow: 0 0 6px rgba(255, 61, 94, 0.5);
+}
+
+.cpr-twins-ai-chip--locked::after {
+  background: repeating-linear-gradient(to right, var(--cpr-ta-danger) 0 2px, transparent 2px 4px);
+}
+
 /* Capacity alarm: toggled once all 5 slots are filled — a jumpy digital
    flicker (steps, not ease) plus a 1px shake, same "glitchy HUD" register
    as the signal meter's jitter, so it reads as an alarm rather than a
@@ -634,13 +676,26 @@
   57% { width: 62%; } 71% { width: 90%; } 85% { width: 68%; } 100% { width: 74%; }
 }
 
-/* ---- CPU meter ---- */
+/* ---- CPU / MEM meters: two identical vertical bars side by side. Shared
+   wrapper carries the position/opacity that used to live on .cpr-twins-ai-
+   cpu alone; MEM's own rules below are otherwise a plain duplicate of
+   CPU's rather than a shared class, so each stays independently tunable
+   (they're driven by unrelated JS state) without fighting over one
+   selector. ---- */
 
-.cpr-twins-ai-cpu {
+.cpr-twins-ai-cpu-mem-row {
   position: absolute;
   left: 16px;
   top: 50%;
   transform: translateY(-50%);
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 14px;
+}
+
+.cpr-twins-ai-cpu,
+.cpr-twins-ai-mem {
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -649,16 +704,21 @@
   transition: opacity 0.4s ease 0.3s;
 }
 
-.cpr-twins-ai-vision--active .cpr-twins-ai-cpu { opacity: 0.9; }
+.cpr-twins-ai-vision--active .cpr-twins-ai-cpu,
+.cpr-twins-ai-vision--active .cpr-twins-ai-mem {
+  opacity: 0.9;
+}
 
-.cpr-twins-ai-cpu-label {
+.cpr-twins-ai-cpu-label,
+.cpr-twins-ai-mem-label {
   font-family: var(--cpr-ta-mono);
   font-size: 0.56rem;
   letter-spacing: 0.1em;
   color: var(--cpr-ta-accent-dim);
 }
 
-.cpr-twins-ai-cpu-track {
+.cpr-twins-ai-cpu-track,
+.cpr-twins-ai-mem-track {
   width: 8px;
   height: 132px;
   background: #0e1a14;
@@ -667,7 +727,8 @@
   overflow: hidden;
 }
 
-.cpr-twins-ai-cpu-fill {
+.cpr-twins-ai-cpu-fill,
+.cpr-twins-ai-mem-fill {
   position: absolute;
   left: 0;
   right: 0;
@@ -678,13 +739,23 @@
   transition: height 0.45s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease;
 }
 
+/* Snappier during a breach — vision-effect.js is also retargeting these
+   far more often (BREACH_TICK_SPEEDUP), and the normal 0.45s glide would
+   just smear four rapid jumps a second into a soft wobble instead of the
+   sharp, chaotic jumping the readings are meant to sell. */
+.cpr-twins-ai-vision--breach .cpr-twins-ai-cpu-fill,
+.cpr-twins-ai-vision--breach .cpr-twins-ai-mem-fill {
+  transition-duration: 0.12s;
+}
+
 /* Sized to the track's own fixed height, not the fill's dynamic one, and
    anchored to the bottom — growing the fill just reveals more of this
    gradient from the bottom up, so the red band only becomes visible once
    the level is actually tall enough to reach it. Same technique as a
    tachometer redline: the danger zone is baked into the gauge, not
    painted on after the fact. */
-.cpr-twins-ai-cpu-fill-gradient {
+.cpr-twins-ai-cpu-fill-gradient,
+.cpr-twins-ai-mem-fill-gradient {
   position: absolute;
   left: 0;
   right: 0;
@@ -704,7 +775,8 @@
   box-shadow: 0 0 10px var(--cpr-ta-accent), 0 0 20px rgba(61, 255, 160, 0.8);
 }
 
-.cpr-twins-ai-cpu-val {
+.cpr-twins-ai-cpu-val,
+.cpr-twins-ai-mem-val {
   font-family: var(--cpr-ta-mono);
   font-size: 0.6rem;
   color: #8fa19d;
@@ -718,13 +790,18 @@
    links never reaches 80% and should never glow red. Ordered after the
    --spiking rules above so this wins on specificity ties when both apply
    at once, which is the common case (an 80%+ reading only ever happens
-   during a spike). */
-.cpr-twins-ai-cpu--critical .cpr-twins-ai-cpu-fill {
+   during a spike, or the whole meter's pegged there for the duration of a
+   netrunner intrusion — see BREACH_LOAD_MIN_PCT in vision-effect.js). */
+.cpr-twins-ai-cpu--critical .cpr-twins-ai-cpu-fill,
+.cpr-twins-ai-mem--critical .cpr-twins-ai-mem-fill {
   box-shadow: 0 0 10px var(--cpr-ta-danger), 0 0 22px rgba(255, 61, 94, 0.85);
   animation: cprTaCpuCriticalPulse 0.7s ease-in-out infinite;
 }
 
-.cpr-twins-ai-cpu--critical .cpr-twins-ai-cpu-val { color: var(--cpr-ta-danger); }
+.cpr-twins-ai-cpu--critical .cpr-twins-ai-cpu-val,
+.cpr-twins-ai-mem--critical .cpr-twins-ai-mem-val {
+  color: var(--cpr-ta-danger);
+}
 
 @keyframes cprTaCpuCriticalPulse {
   0%, 100% { box-shadow: 0 0 10px var(--cpr-ta-danger), 0 0 22px rgba(255, 61, 94, 0.85); }
@@ -734,22 +811,47 @@
 /* ---- terminal window: sits below the CPU meter on the left edge, prints
    the handshake sequence from VisionEffect#_terminalPrint() one line at a
    time. Older lines are pruned once the box is full rather than actually
-   scrolled — see the JS comment for why that's good enough here. ---- */
+   scrolled — see the JS comment for why that's good enough here.
 
-.cpr-twins-ai-terminal {
+   The log and the input are two separate boxes (own border/background
+   each) stacked with a gap, not one box with an input row glued inside —
+   the stack wrapper positions both and lets .cpr-twins-ai-terminal--
+   intrusion (toggled on the wrapper, not either child) reach both without
+   needing a parent/child relationship between them. ---- */
+
+.cpr-twins-ai-terminal-stack {
   position: absolute;
   left: 16px;
   top: calc(50% + 100px);
   width: 210px;
-  min-height: 92px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cpr-twins-ai-terminal {
+  width: 100%;
+  box-sizing: border-box;
+  /* Fits 9 printed lines (TERMINAL_MAX_LINES) plus padding. */
+  min-height: 156px;
   background: #0e1a14;
   border: 1px solid var(--cpr-ta-accent-dim);
   padding: 6px 8px;
   opacity: 0;
-  transition: opacity 0.4s ease 0.3s;
+  transition: opacity 0.4s ease 0.3s, border-color 0.3s ease;
 }
 
-.cpr-twins-ai-vision--active .cpr-twins-ai-terminal { opacity: 0.9; }
+.cpr-twins-ai-vision--active .cpr-twins-ai-terminal,
+.cpr-twins-ai-vision--active .cpr-twins-ai-terminal-input-row {
+  opacity: 0.9;
+}
+
+/* Both boxes' borders pick up the danger color while an intrusion's live,
+   so the whole stack reads as "under attack," not just the log's line. */
+.cpr-twins-ai-terminal-stack.cpr-twins-ai-terminal--intrusion .cpr-twins-ai-terminal,
+.cpr-twins-ai-terminal-stack.cpr-twins-ai-terminal--intrusion .cpr-twins-ai-terminal-input-row {
+  border-color: var(--cpr-ta-danger);
+}
 
 .cpr-twins-ai-terminal-lines {
   display: flex;
@@ -776,9 +878,239 @@
   text-shadow: 0 0 6px rgba(234, 255, 242, 0.8);
 }
 
+/* The netrunner-intrusion alert/resolution lines — same entrance as every
+   other line, plus a few pulses of the danger glow so a line that appears
+   mid-session (not during a scripted sequence the player is already
+   watching) still grabs the eye. */
+.cpr-twins-ai-terminal-line--danger {
+  color: var(--cpr-ta-danger);
+  text-shadow: 0 0 6px rgba(255, 61, 94, 0.8);
+  font-weight: 600;
+  animation: cprTaTerminalLineIn 0.15s ease-out forwards, cprTaDangerPulse 1.1s ease-in-out 0.15s 3;
+}
+
 @keyframes cprTaTerminalLineIn {
   from { opacity: 0; transform: translateY(2px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes cprTaDangerPulse {
+  0%, 100% { text-shadow: 0 0 6px rgba(255, 61, 94, 0.8); }
+  50% { text-shadow: 0 0 13px rgba(255, 61, 94, 1); }
+}
+
+/* ---- terminal result: a second, non-scrolling readout between the log
+   and the input row (see vision-effect.js's printTerminalLines()/
+   _setTerminalResult()) — pins whatever a command last actually said,
+   since the scrolling log alone moves too fast (ambient chatter, and
+   during a breach everything at BREACH_FAST_SPEEDUP) to reliably read a
+   multi-line result like "find user -all"'s roster before it's pushed
+   out. Starts collapsed to nothing (zero padding, transparent border) so
+   it doesn't just sit there as an empty box before the first command —
+   .show (added the first time a command actually prints something) is
+   what gives it real size and a visible border, and it stays that way
+   from then on, just swapping content each time. Lines inside reuse
+   .cpr-twins-ai-terminal-line's own styling directly, so a result reads
+   identically to how it looked in the scrolling log a moment earlier. */
+
+.cpr-twins-ai-terminal-result {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  background: #0e1a14;
+  border: 1px solid transparent;
+  padding: 0;
+  opacity: 0;
+  transition: opacity 0.3s ease, padding 0.2s ease, border-color 0.2s ease;
+}
+
+.cpr-twins-ai-terminal-result.show {
+  padding: 6px 8px;
+  border-color: var(--cpr-ta-accent-dim);
+}
+
+.cpr-twins-ai-vision--active .cpr-twins-ai-terminal-result.show {
+  opacity: 0.9;
+}
+
+/* ---- terminal input: its own standalone box below the log (see
+   .cpr-twins-ai-terminal-stack above), live for as long as the HUD is up
+   (see vision-effect.js's _submitTerminalInput()), not shown/hidden per
+   intrusion — anything typed here just echoes into the log above it and
+   ages out like any other line. Neutral/green by default, matching the
+   rest of the terminal; only picks up the danger-red treatment (see
+   .cpr-twins-ai-terminal--intrusion above) while there's actually
+   something to evict, so it doesn't cry wolf the rest of the time. The
+   terminal root carries pointer-events:none (it sits over the canvas and
+   everything in the HUD is normally look-don't-touch) so this specifically
+   opts back in — same technique as .cpr-twins-ai-tag's click target. ---- */
+
+.cpr-twins-ai-terminal-input-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  box-sizing: border-box;
+  width: 100%;
+  padding: 5px 8px;
+  background: #0e1a14;
+  border: 1px solid var(--cpr-ta-accent-dim);
+  opacity: 0;
+  transition: opacity 0.4s ease 0.3s, border-color 0.3s ease;
+}
+
+.cpr-twins-ai-terminal-input-prompt {
+  font-family: var(--cpr-ta-mono);
+  font-size: 0.58rem;
+  color: var(--cpr-ta-accent);
+  text-shadow: 0 0 4px rgba(61, 255, 160, 0.5);
+  transition: color 0.3s ease, text-shadow 0.3s ease;
+}
+
+.cpr-twins-ai-terminal-stack.cpr-twins-ai-terminal--intrusion .cpr-twins-ai-terminal-input-prompt {
+  color: var(--cpr-ta-danger);
+  text-shadow: 0 0 4px rgba(255, 61, 94, 0.6);
+}
+
+.cpr-twins-ai-terminal-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: var(--cpr-ta-mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.02em;
+  color: var(--cpr-ta-ink);
+  pointer-events: auto;
+}
+
+.cpr-twins-ai-terminal-input::placeholder {
+  color: rgba(234, 255, 242, 0.35);
+}
+
+.cpr-twins-ai-terminal-input:focus-visible {
+  box-shadow: 0 0 0 1px var(--cpr-ta-accent);
+}
+
+/* ---- netrunner-intrusion "security breach" alarm: a whole-screen red
+   strobe plus a center banner, toggled together via
+   .cpr-twins-ai-vision--breach on the root (see vision-effect.js's
+   startIntrusion()/_endIntrusion()). Deliberately louder and more general
+   than the terminal's own red line/border — that's for whoever's actually
+   watching the terminal box, this is for the whole table to notice at a
+   glance regardless of what they're looking at. Both siblings of
+   everything else in the HUD (not nested inside .cpr-twins-ai-safe), so
+   neither is affected by the HUD's own resolution-scaling transform and
+   both paint over the entire vision root, chrome included. ---- */
+
+.cpr-twins-ai-breach-flash {
+  position: absolute;
+  inset: 0;
+  background: var(--cpr-ta-danger);
+  opacity: 0;
+  mix-blend-mode: overlay;
+  pointer-events: none;
+}
+
+.cpr-twins-ai-vision--breach .cpr-twins-ai-breach-flash {
+  animation: cprTaBreachFlash 0.9s ease-in-out infinite;
+}
+
+@keyframes cprTaBreachFlash {
+  0%, 100% { opacity: 0; }
+  50% { opacity: 0.4; }
+}
+
+.cpr-twins-ai-breach-banner {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 90%;
+  transform: translate(-50%, -50%);
+  font-family: var(--cpr-ta-mono);
+  font-size: clamp(1.1rem, 3.2vw, 2.1rem);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-align: center;
+  text-wrap: balance;
+  color: var(--cpr-ta-danger);
+  text-shadow: 0 0 12px rgba(255, 61, 94, 0.9), 0 0 28px rgba(255, 61, 94, 0.6);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.cpr-twins-ai-vision--breach .cpr-twins-ai-breach-banner {
+  animation: cprTaBreachTextBlink 0.9s ease-in-out infinite;
+}
+
+@keyframes cprTaBreachTextBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.12; }
+}
+
+/* ---- chrome-effects.js prototype: a red strobe over a piece of
+   Foundry's OWN UI (the sidebar, the scene nav bar) instead of over the
+   canvas. position:fixed since these targets live outside
+   #cpr-twins-ai-vision entirely — plain page chrome, not anything sized/
+   positioned relative to the canvas. A high z-index to sit above
+   Foundry's own (already fairly high) chrome z-indexes.
+
+   mix-blend-mode: saturation here turned out fine despite
+   #cpr-twins-ai-vision's own comment about blending needing that
+   element to not start a new stacking context of its own (position:fixed
+   + z-index does exactly that) — that constraint is about a *parent*
+   wrapping the blended layer and everything it should blend against, so
+   nothing further back gets trapped in an isolated bubble. This overlay
+   isn't a wrapper around anything; it's a lone fixed-position sibling
+   directly under body blending against Foundry's own chrome behind it,
+   confirmed actually blending against a real render rather than assumed
+   from how the two setups compare on paper.
+
+   backdrop-filter (already proven in this file — see .cpr-twins-ai-vhs-
+   line) is what makes the "blown out" look possible from a plain overlay
+   at all: unlike filter, which only affects the element's own content, it
+   distorts whatever's rendered *behind* the element — Foundry's real chat
+   text/nav label — without this needing to touch that markup directly.
+   Pulses in sync with the red strobe rather than sitting blurred the
+   whole time, so chat stays readable between hits instead of being
+   illegible for the entire breach.
+
+   The red tint's strength is animated via the background color's own
+   alpha channel, deliberately NOT the element's opacity — confirmed
+   against a real render (not just computed-style output, which reported
+   the property fine either way) that opacity < 1 on an element quietly
+   suppresses its own backdrop-filter in this engine, even though nothing
+   about that combination looks invalid. Keeping opacity at its default 1
+   throughout and doing all the "how much is this showing" work through
+   rgba() alpha instead is what actually gets the blur to render — and
+   turns out to still drive the saturation blend's own strength correctly
+   too, same as it drives a plain background tint. ---- */
+
+.cpr-twins-ai-chrome-breach {
+  position: fixed;
+  background: rgba(255, 61, 94, 0);
+  mix-blend-mode: saturation;
+  pointer-events: none;
+  z-index: 9000;
+  backdrop-filter: blur(0px) brightness(1) contrast(1);
+  -webkit-backdrop-filter: blur(0px) brightness(1) contrast(1);
+}
+
+.cpr-twins-ai-chrome-breach.show {
+  animation: cprTaChromeBreachFlash 0.2s ease-in-out infinite;
+}
+
+@keyframes cprTaChromeBreachFlash {
+  0%, 100% {
+    background: rgba(255, 61, 94, 0);
+    backdrop-filter: blur(0px) brightness(1) contrast(1);
+    -webkit-backdrop-filter: blur(0px) brightness(1) contrast(1);
+  }
+  50% {
+    background: rgba(255, 61, 94, 0.4);
+    backdrop-filter: blur(6px) brightness(1.9) contrast(1.3);
+    -webkit-backdrop-filter: blur(6px) brightness(1.9) contrast(1.3);
+  }
 }
 
 /* ---- right-side telemetry stack: mirrors the CPU meter on the left.
@@ -886,6 +1218,43 @@
   width: 112px;
   height: 22px;
   margin-top: 3px;
+}
+
+/* ---- command quick-reference: a semi-transparent column stacked down
+   the right side, under the telemetry stack, listing the terminal
+   keywords the registry actually recognizes (see registerTerminalCommand
+   in vision-effect.js, netrunner-intrusion.js's "eccm", terminal-
+   commands.js's "sbim"/"find"/"sendmc") — flavor documentation for
+   players, not itself interactive. right:16px/top offset matches
+   .cpr-twins-ai-telemetry's own right edge and the left side's terminal-
+   stack clearance below CPU/MEM, for left/right symmetry — same
+   column-stack shape as that telemetry block too. Dimmer than the rest of
+   the HUD (0.55 vs. the usual 0.9) — a reference strip, not another live
+   instrument competing for attention. ---- */
+
+.cpr-twins-ai-command-ref {
+  position: absolute;
+  right: 16px;
+  top: calc(50% + 100px);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 0.4s ease 0.35s;
+}
+
+.cpr-twins-ai-vision--active .cpr-twins-ai-command-ref { opacity: 0.55; }
+
+.cpr-twins-ai-command-ref-item {
+  font-family: var(--cpr-ta-mono);
+  font-size: 0.48rem;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  color: var(--cpr-ta-ink);
+  background: rgba(14, 26, 20, 0.55);
+  border: 1px solid rgba(61, 255, 160, 0.3);
+  padding: 3px 6px;
 }
 
 /* ---- bottom watermark ---- */
@@ -1058,6 +1427,42 @@
   box-shadow: 0 0 8px rgba(234, 255, 242, 0.85), inset 0 0 6px rgba(234, 255, 242, 0.35);
 }
 
+/* Netrunner intrusion: every outline flickers erratically for as long as
+   one's live — "the AI is struggling to hold the link," same read as the
+   HUD's own faster jitter bursts during a breach (see
+   vision-effect.js's intrusionStart/intrusionEnd hooks, which
+   overlay.js's registerOverlayHooks() turns into this class on the shared
+   lock layer). steps(1, end) for a hard glitchy snap between levels
+   rather than a smooth pulse — several uneven near-blackouts per cycle,
+   not a steady blink. Each outline runs its own --cpr-ta-flicker-duration/
+   -delay (set once in buildOutline()), so the whole table's borders read
+   as independently unstable instead of one synchronized strobe. Wins over
+   the plain opacity transition above for as long as it's applied (a CSS
+   animation always overrides a transition on the same property), and
+   falls cleanly back to steady opacity:1 the instant the class is
+   removed. */
+#cpr-twins-ai-lock-layer.cpr-twins-ai-outlines-erratic .cpr-twins-ai-scan-outline {
+  animation: cprTaOutlineFlicker var(--cpr-ta-flicker-duration, 1s) steps(1, end) infinite;
+  animation-delay: var(--cpr-ta-flicker-delay, 0s);
+}
+
+@keyframes cprTaOutlineFlicker {
+  0%, 100% { opacity: 1; }
+  6% { opacity: 0.12; }
+  11% { opacity: 1; }
+  17% { opacity: 0.4; }
+  23% { opacity: 1; }
+  41% { opacity: 1; }
+  47% { opacity: 0.08; }
+  53% { opacity: 1; }
+  68% { opacity: 1; }
+  73% { opacity: 0.3; }
+  78% { opacity: 1; }
+  89% { opacity: 1; }
+  93% { opacity: 0.15; }
+  97% { opacity: 1; }
+}
+
 /* ---- claimed-token marker: a small bouncing triangle over any currently-
    claimed token, visible to the whole table (unlike the lock above, which
    is hidden from players who don't own it) — an at-a-glance "this one's
@@ -1148,8 +1553,11 @@
   .cpr-twins-ai-beam::after,
   .cpr-twins-ai-targets--maxed .cpr-twins-ai-chip--filled,
   .cpr-twins-ai-cpu--critical .cpr-twins-ai-cpu-fill,
+  .cpr-twins-ai-mem--critical .cpr-twins-ai-mem-fill,
   .cpr-twins-ai-vision--jitter .cpr-twins-ai-safe,
   .cpr-twins-ai-vision--jitter .cpr-twins-ai-flash,
+  .cpr-twins-ai-vision--jitter.cpr-twins-ai-vision--breach .cpr-twins-ai-safe,
+  .cpr-twins-ai-vision--jitter.cpr-twins-ai-vision--breach .cpr-twins-ai-flash,
   .cpr-twins-ai-vision--jitter .cpr-twins-ai-readout,
   .cpr-twins-ai-vision--jitter .cpr-twins-ai-counter,
   .cpr-twins-ai-vision--active .cpr-twins-ai-readout,
@@ -1157,23 +1565,49 @@
   .cpr-twins-ai-thermal-warning.show,
   .cpr-twins-ai-claim-triangle,
   .cpr-twins-ai-terminal-line,
+  .cpr-twins-ai-terminal-line--danger,
   .cpr-twins-ai-boot-terminal-line,
   .cpr-twins-ai-boot-popup,
   .cpr-twins-ai-vision--active.cpr-twins-ai-vision--poweron .cpr-twins-ai-duotone,
   .cpr-twins-ai-vision--active.cpr-twins-ai-vision--poweron .cpr-twins-ai-vignette,
-  .cpr-twins-ai-vision--active.cpr-twins-ai-vision--poweron .cpr-twins-ai-scanlines {
+  .cpr-twins-ai-vision--active.cpr-twins-ai-vision--poweron .cpr-twins-ai-scanlines,
+  .cpr-twins-ai-vision--breach .cpr-twins-ai-breach-flash,
+  .cpr-twins-ai-vision--breach .cpr-twins-ai-breach-banner {
     animation: none;
   }
 
   .cpr-twins-ai-thermal-warning.show,
   .cpr-twins-ai-terminal-line,
   .cpr-twins-ai-boot-terminal-line,
-  .cpr-twins-ai-boot-popup {
+  .cpr-twins-ai-boot-popup,
+  .cpr-twins-ai-vision--breach .cpr-twins-ai-breach-banner {
     opacity: 1;
+  }
+
+  /* A full-screen strobe is a real hazard, not just a decorative loop —
+     drop it entirely rather than just slowing it down; the banner above
+     (now static instead of blinking) still carries the alert on its own. */
+  .cpr-twins-ai-vision--breach .cpr-twins-ai-breach-flash {
+    opacity: 0;
+  }
+
+  .cpr-twins-ai-chrome-breach.show {
+    animation: none;
+    background: rgba(255, 61, 94, 0);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 
   .cpr-twins-ai-scan-outline {
     transition: none;
+  }
+
+  /* A rapid, erratic opacity strobe on every token's border is exactly
+     the kind of motion this preference exists to remove — outlines stay
+     steadily visible through an intrusion instead. */
+  #cpr-twins-ai-lock-layer.cpr-twins-ai-outlines-erratic .cpr-twins-ai-scan-outline {
+    animation: none;
+    opacity: 1;
   }
 
   .cpr-twins-ai-canvas,
@@ -1186,6 +1620,8 @@
   .cpr-twins-ai-logo,
   .cpr-twins-ai-cpu,
   .cpr-twins-ai-cpu-fill,
+  .cpr-twins-ai-mem,
+  .cpr-twins-ai-mem-fill,
   .cpr-twins-ai-targets,
   .cpr-twins-ai-chip,
   .cpr-twins-ai-legal,
@@ -1194,6 +1630,9 @@
   .cpr-twins-ai-telemetry,
   .cpr-twins-ai-vital-bar i,
   .cpr-twins-ai-terminal,
+  .cpr-twins-ai-terminal-result,
+  .cpr-twins-ai-terminal-input-row,
+  .cpr-twins-ai-terminal-input-prompt,
   .cpr-twins-ai-boot,
   .cpr-twins-ai-boot-logo {
     transition-duration: 0.01ms !important;
