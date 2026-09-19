@@ -1,0 +1,73 @@
+/* ---------- Dialog ---------- */
+.cpr-translation-dialog .hint {
+  margin: 0 0 4px;
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.cpr-translation-dialog textarea {
+  font-family: "Courier New", monospace;
+  resize: vertical;
+}
+
+/* ---------- On-screen overlay ---------- */
+#cpr-live-translation-overlay {
+  position: fixed;
+  left: 50%;
+  transform: translate(-50%, 8px);
+  z-index: 100;
+  width: min(70vw, 900px);
+  text-align: center;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s ease, transform 0.35s ease;
+}
+
+#cpr-live-translation-overlay.position-bottom { bottom: 8vh; }
+#cpr-live-translation-overlay.position-top { top: 8vh; transform: translate(-50%, -8px); }
+
+#cpr-live-translation-overlay.visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.cpr-translation-line {
+  font-family: "Courier New", monospace;
+  font-size: 20px;
+  line-height: 1.4;
+  color: #eafcff;
+  text-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.9),
+    0 0 10px rgba(0, 0, 0, 0.8);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.cpr-translation-line.settled {
+  color: #ffffff;
+}
+
+.cpr-translation-line.pre-translation {
+  color: #ffb020;
+  font-style: italic;
+  opacity: 0.85;
+}
+
+.cpr-source-char {
+  color: #ffb020;
+  font-style: italic;
+  opacity: 0.85;
+}
+
+.cpr-glitch-char {
+  display: inline-block;
+  color: #ff2ec4;
+  text-shadow: 0 0 8px rgba(255, 46, 196, 0.9);
+  animation: cpr-glitch-jitter 0.12s steps(2, end) infinite;
+}
+
+@keyframes cpr-glitch-jitter {
+  0%   { transform: translateY(0) skewX(0deg); opacity: 1; }
+  50%  { transform: translateY(-1px) skewX(-6deg); opacity: 0.65; }
+  100% { transform: translateY(1px) skewX(4deg); opacity: 1; }
+}

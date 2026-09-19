@@ -1,0 +1,29 @@
+{
+  "CPR_TRANSLATION": {
+    "MacroName": "Live Translation",
+    "DialogTitle": "Live Translation",
+    "SourceLabel": "Source Text",
+    "SourceHint": "The line(s) as spoken in the original language.",
+    "EnglishLabel": "English Translation",
+    "EnglishHint": "The matching English line(s). Line 1 pairs with line 1, line 2 with line 2, etc.",
+    "TargetLabel": "Show To",
+    "TargetAll": "All Players",
+    "TargetSelf": "Only Me (Preview)",
+    "PlayButton": "Transmit",
+    "CancelButton": "Cancel",
+    "WarnEmpty": "Enter at least one source/English line pair before transmitting.",
+    "WarnGmOnly": "Only the GM can trigger the live translation effect.",
+    "SettingPosition": "Overlay Position",
+    "SettingPositionHint": "Where the translation subtitle bar appears on screen.",
+    "PositionTop": "Top",
+    "PositionBottom": "Bottom",
+    "SettingCharSpeed": "Decrypt Speed",
+    "SettingCharSpeedHint": "Milliseconds per character while the line decrypts into English. Lower is faster.",
+    "SettingSourceHoldTime": "Source Text Hold",
+    "SettingSourceHoldTimeHint": "Milliseconds the original, untranslated source text is shown before the decrypt effect begins.",
+    "SettingHoldTime": "Hold Duration",
+    "SettingHoldTimeHint": "Milliseconds the fully-translated line stays on screen before it clears (or before the next line begins).",
+    "SettingGmOnly": "Restrict Triggering to GM",
+    "SettingGmOnlyHint": "If enabled, only the GM can open the Live Translation dialog and trigger the effect."
+  }
+}

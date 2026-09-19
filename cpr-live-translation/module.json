@@ -1,0 +1,29 @@
+{
+  "id": "cpr-live-translation",
+  "title": "Live Translation Effect",
+  "description": "A Cyberpunk 2077-style real-time translation subtitle. Enter a line of source text and its English translation, and it decrypts/morphs into English left-to-right on screen, with a slight in-progress delay, just like an in-world translator chip.",
+  "version": "1.0.0",
+  "compatibility": {
+    "minimum": "11",
+    "verified": "12"
+  },
+  "authors": [
+    {
+      "name": "Ryan Schultz"
+    }
+  ],
+  "esmodules": [
+    "scripts/main.js"
+  ],
+  "styles": [
+    "styles/translation.css"
+  ],
+  "languages": [
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "lang/en.json"
+    }
+  ],
+  "socket": true
+}
