@@ -2,9 +2,31 @@ import { MODULE_ID, isModeEnabled } from './data.js';
 import { registerSheetInjectorHooks } from './sheet-injector.js';
 import { registerOverlayHooks } from './overlay.js';
 import { registerSocketHooks } from './socket.js';
+import { registerIntrusionHooks, triggerIntrusion } from './netrunner-intrusion.js';
+import { registerBlackIceIntrusionHooks, triggerBlackIceIntrusion } from './blackice-intrusion.js';
+import { registerCacheCorruptionHooks, triggerCacheCorruption } from './cache-corruption.js';
+import { registerUnknownIntrusionHooks, triggerUnknownIntrusion } from './unknown-intrusion.js';
+import { registerBuiltinTerminalCommands } from './terminal-commands.js';
+import { registerChromeEffectHooks } from './chrome-effects.js';
 import { visionEffect } from './vision-effect.js';
 
 const CONTROL_LAYER_NAME = 'cprTwinsAiLayer';
+
+// Optional pairing, not a hard dependency — cpr-quick-info starts disabled
+// with no toggle of its own (see its main.js) and expects something else to
+// drive it. Rogue AI Vision is "the AI is scanning the room for you," so
+// the AI also handing over at-a-glance target info while that's on is the
+// same beat; this just reaches for the other module's api if it's active
+// and no-ops otherwise, the same guard style as weapon-shooter.js's check
+// for cyberpunk-red-vehicles.
+const QUICK_INFO_MODULE_ID = 'cpr-quick-info';
+
+function syncQuickInfoHud(enabled) {
+  const api = game.modules.get(QUICK_INFO_MODULE_ID)?.api;
+  if (!api) return;
+  if (enabled) api.enable();
+  else api.disable();
+}
 
 // The scene-control group below has no real canvas tool of its own, only
 // the mode toggle — Foundry's scene-control click handler only re-renders
@@ -22,6 +44,16 @@ Hooks.once('init', () => {
   game.settings.register(MODULE_ID, 'modeEnabled', {
     name: 'Allow players to take control of eligible tokens',
     hint: 'While on, players see a "Take Control" prompt above tokens flagged Player-Takeable on their actor sheet, and every connected client gets the Rogue AI Vision screen effect.',
+    scope: 'world',
+    config: false,
+    type: Boolean,
+    default: false,
+  });
+
+  // World-scoped like modeEnabled, for the same reason: every client needs
+  // to agree on this without a relay message, and Foundry already syncs a
+  // world setting's changes to everyone on its own. See cache-corruption.js.
+  game.settings.register(MODULE_ID, 'cacheCorrupted', {
     scope: 'world',
     config: false,
     type: Boolean,
@@ -54,6 +86,12 @@ Hooks.once('init', () => {
   registerSheetInjectorHooks();
   registerOverlayHooks();
   registerSocketHooks();
+  registerIntrusionHooks();
+  registerBlackIceIntrusionHooks();
+  registerCacheCorruptionHooks();
+  registerUnknownIntrusionHooks();
+  registerBuiltinTerminalCommands();
+  registerChromeEffectHooks();
 });
 
 // Mounts/tears down the full-screen vision effect to match the setting —
@@ -61,6 +99,7 @@ Hooks.once('init', () => {
 // mode is already on.
 Hooks.once('ready', () => {
   if (isModeEnabled()) visionEffect.mount();
+  syncQuickInfoHud(isModeEnabled());
 });
 
 Hooks.on('canvasReady', () => visionEffect.refreshChips());
@@ -111,6 +150,56 @@ Hooks.on('getSceneControlButtons', (controls) => {
         active: isModeEnabled(),
         onClick: (active) => game.settings.set(MODULE_ID, 'modeEnabled', active),
       },
+      // Momentary action, not a toggle (button:true, no active/state) — the
+      // GM picking the moment themselves, on purpose, replacing what used
+      // to be a random timer. triggerIntrusion() itself no-ops with a
+      // warning if the mode's off or one's already running.
+      {
+        name: 'trigger-intrusion',
+        title: 'Trigger Netrunner Intrusion',
+        icon: 'fa-solid fa-user-secret',
+        button: true,
+        onClick: () => triggerIntrusion(),
+      },
+      {
+        name: 'trigger-blackice',
+        title: 'Trigger Black Ice Intrusion',
+        icon: 'fa-solid fa-shield-halved',
+        button: true,
+        onClick: () => triggerBlackIceIntrusion(),
+      },
+      {
+        name: 'trigger-cache-corruption',
+        title: 'Trigger Cache Corruption',
+        icon: 'fa-solid fa-microchip',
+        button: true,
+        onClick: () => triggerCacheCorruption(),
+      },
+      {
+        name: 'trigger-unknown',
+        title: 'Trigger Unknown Intrusion',
+        icon: 'fa-solid fa-circle-question',
+        button: true,
+        onClick: () => triggerUnknownIntrusion(),
+      },
+      // For clearing up some local glitch on this client without making
+      // everyone sit through the ~10s cinematic pre-roll again — mount()
+      // itself only skips the boot sequence when explicitly told to
+      // (skipBoot), every other caller of it still gets the normal one.
+      {
+        name: 'restart-vision-skip-boot',
+        title: 'Restart Vision (Skip Animation)',
+        icon: 'fa-solid fa-rotate-right',
+        button: true,
+        onClick: () => {
+          if (!isModeEnabled()) {
+            ui.notifications.warn('Turn on the Rogue AI Vision mode first.');
+            return;
+          }
+          visionEffect.destroy();
+          visionEffect.mount({ skipBoot: true });
+        },
+      },
     ],
   };
 
@@ -125,5 +214,6 @@ Hooks.on('updateSetting', (setting) => {
   if (setting.key !== `${MODULE_ID}.modeEnabled`) return;
   if (isModeEnabled()) visionEffect.mount();
   else visionEffect.destroy();
+  syncQuickInfoHud(isModeEnabled());
   if (game.user.isGM) ui.controls.render();
 });

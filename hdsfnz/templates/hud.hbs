@@ -1,0 +1,121 @@
+<div class="hdsfnz-stage">
+  <div class="hdsfnz-scanline"></div>
+
+  <header class="hdsfnz-header">
+    <div class="hdsfnz-title-block">
+      <div class="hdsfnz-jp">ハイパーデモンストライクフォース <span class="hdsfnz-accent">NEGATIVE ZERO</span></div>
+      <div class="hdsfnz-en">HYPER DEMON STRIKE FORCE NEGATIVE ZERO</div>
+      <div class="hdsfnz-sub">RISE OF THE LAST APOCALYPSE VANGUARDS</div>
+    </div>
+    <div class="hdsfnz-header-accent"><span></span><span></span><span></span></div>
+    <div class="hdsfnz-motto">
+      <div class="hdsfnz-jp-line">まだ終わっていない。</div>
+      <div>STILL NOT OVER.</div>
+    </div>
+  </header>
+
+  <div class="hdsfnz-left hdsfnz-panel">
+    <div class="hdsfnz-area-label">
+      <svg class="hdsfnz-emblem" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2 L20 8 L16 8 L22 20 L12 15 L2 20 L8 8 L4 8 Z" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>
+      <div class="hdsfnz-area-label-text">
+        <div class="hdsfnz-en hdsfnz-display">AREA</div>
+        <div class="hdsfnz-jp">OLD METROPOLIS</div>
+      </div>
+    </div>
+    <ul class="hdsfnz-menu">
+      <li class="active"><span class="hdsfnz-arrow">&#9654;</span> MAP</li>
+      <li><span class="hdsfnz-arrow">&#9654;</span> ITEM</li>
+      <li><span class="hdsfnz-arrow">&#9654;</span> EQUIP</li>
+      <li><span class="hdsfnz-arrow">&#9654;</span> STATUS</li>
+      <li><span class="hdsfnz-arrow">&#9654;</span> DATA</li>
+      <li><span class="hdsfnz-arrow">&#9654;</span> SYSTEM</li>
+    </ul>
+    <div class="hdsfnz-minimap">
+      <div class="hdsfnz-compass">N&nbsp;&nbsp;&nbsp;W&nbsp;E&nbsp;&nbsp;&nbsp;S</div>
+      <div class="hdsfnz-minimap-path"></div>
+      <div class="hdsfnz-player-arrow"></div>
+    </div>
+  </div>
+
+  <div class="hdsfnz-center"></div>
+
+  <div class="hdsfnz-right hdsfnz-panel">
+    <div class="hdsfnz-panel-title">SQUAD <span class="hdsfnz-slash">///</span></div>
+
+    <div class="hdsfnz-stat-row">
+      <div class="hdsfnz-label"><b>HP</b><span>{{#if hasActor}}{{hp.value}} / {{hp.max}}{{else}}-- / --{{/if}}</span></div>
+      <div class="hdsfnz-bar hdsfnz-hp"><span style="width:{{hpPct}}%"></span></div>
+    </div>
+    <div class="hdsfnz-stat-row">
+      <div class="hdsfnz-label"><b>EP</b><span>{{#if hasActor}}{{ep.value}} / {{ep.max}}{{else}}-- / --{{/if}}</span></div>
+      <div class="hdsfnz-bar hdsfnz-ep"><span style="width:{{epPct}}%"></span></div>
+    </div>
+    <div class="hdsfnz-stat-row">
+      <div class="hdsfnz-label"><b>STAM</b><span>{{#if hasActor}}{{stam.value}} / {{stam.max}}{{else}}-- / --{{/if}}</span></div>
+      <div class="hdsfnz-bar hdsfnz-stam"><span style="width:{{stamPct}}%"></span></div>
+    </div>
+    <div class="hdsfnz-stat-row">
+      <div class="hdsfnz-label"><b>AMMO</b><span>{{#if hasActor}}{{ammo.value}} / {{ammo.max}}{{else}}-- / --{{/if}}</span></div>
+      <div class="hdsfnz-bar hdsfnz-ammo"><span style="width:{{ammoPct}}%"></span></div>
+    </div>
+    <div class="hdsfnz-condition hdsfnz-condition--{{condition.id}}">
+      <span>CONDITION: {{#if hasActor}}{{condition.label}}{{else}}--{{/if}}</span>
+      <svg class="hdsfnz-pulse" viewBox="0 0 40 14" xmlns="http://www.w3.org/2000/svg"><polyline points="0,7 8,7 11,2 15,12 19,7 40,7" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+    </div>
+
+    <div class="hdsfnz-datetime">
+      <div class="hdsfnz-op">{{#if hasActor}}{{className}}{{else}}NO UNIT LINKED{{/if}}</div>
+      {{#if classMotto}}
+      <div class="hdsfnz-flavor">
+        <div>&ldquo;{{classMotto}}&rdquo;</div>
+      </div>
+      {{/if}}
+    </div>
+  </div>
+
+  <div class="hdsfnz-bottom hdsfnz-panel">
+    <div class="hdsfnz-portrait">
+      <div class="hdsfnz-art{{#if portraitImg}} hdsfnz-art--filled{{/if}}" style="{{#if portraitImg}}background-image:url('{{portraitImg}}');{{/if}}"></div>
+      <div class="hdsfnz-name"><b>{{#if hasActor}}{{actorName}}{{else}}NO UNIT{{/if}}</b>UNIT {{unitNumber}}</div>
+    </div>
+
+    <div class="hdsfnz-dialogue">
+      <div class="hdsfnz-speaker">{{#if dialogueSpeaker}}{{dialogueSpeaker}}{{else}}SYSTEM{{/if}}</div>
+      <div class="hdsfnz-line">{{#if dialogueLine}}{{dialogueLine}}{{else}}STANDING BY.{{/if}}</div>
+      <div class="hdsfnz-footer">
+        <span>HYPER DEMON STRIKE FORCE NEGATIVE ZERO</span>
+        <span>MESSAGE LOG</span>
+      </div>
+    </div>
+
+    <div class="hdsfnz-equip">
+      {{#each mainGear}}
+      <div class="hdsfnz-equip-row">
+        <svg class="hdsfnz-gear-icon" viewBox="0 0 44 18" xmlns="http://www.w3.org/2000/svg"><path d="M2 12h6v-3h4v-3h20l4 3h6v5h-6l-2 3h-6v-3H14l-2 3H6z" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="30" cy="6" r="2" fill="none" stroke="currentColor" stroke-width="1"/></svg>
+        <span class="hdsfnz-slot">MAIN</span><span class="hdsfnz-item">{{this.system.code}}</span>
+      </div>
+      {{else}}
+      <div class="hdsfnz-equip-row">
+        <svg class="hdsfnz-gear-icon" viewBox="0 0 44 18" xmlns="http://www.w3.org/2000/svg"><path d="M2 12h6v-3h4v-3h20l4 3h6v5h-6l-2 3h-6v-3H14l-2 3H6z" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="30" cy="6" r="2" fill="none" stroke="currentColor" stroke-width="1"/></svg>
+        <span class="hdsfnz-slot">MAIN</span><span class="hdsfnz-item">&mdash;</span>
+      </div>
+      {{/each}}
+      {{#each subGear}}
+      <div class="hdsfnz-equip-row">
+        <svg class="hdsfnz-gear-icon" viewBox="0 0 30 22" xmlns="http://www.w3.org/2000/svg"><path d="M2 8h16v4h4v4h-4v4h-6v-4H8v-4H2z" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>
+        <span class="hdsfnz-slot">SUB</span><span class="hdsfnz-item">{{this.system.code}}</span>
+      </div>
+      {{else}}
+      <div class="hdsfnz-equip-row">
+        <svg class="hdsfnz-gear-icon" viewBox="0 0 30 22" xmlns="http://www.w3.org/2000/svg"><path d="M2 8h16v4h4v4h-4v4h-6v-4H8v-4H2z" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>
+        <span class="hdsfnz-slot">SUB</span><span class="hdsfnz-item">&mdash;</span>
+      </div>
+      {{/each}}
+      <div class="hdsfnz-speshal">
+        <div class="hdsfnz-speshal-label"><span>SPESHAL</span><span>???</span></div>
+        <div class="hdsfnz-bar"><span style="width:{{speshal}}%"></span></div>
+      </div>
+    </div>
+  </div>
+
+</div>

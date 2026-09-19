@@ -1,0 +1,32 @@
+{
+  "id": "cpr-quick-info",
+  "title": "CPR Quick Info",
+  "description": "Hover an enemy token to see a compact at-a-glance card: portrait, name, role, and currently carried weapons/installed cyberware.",
+  "version": "0.1.0",
+  "compatibility": {
+    "minimum": "12",
+    "verified": "12"
+  },
+  "authors": [
+    {
+      "name": "Ryan Schultz"
+    }
+  ],
+  "relationships": {
+    "systems": [
+      {
+        "id": "cyberpunk-red-core",
+        "type": "system",
+        "compatibility": {
+          "minimum": "0.92.0"
+        }
+      }
+    ]
+  },
+  "esmodules": [
+    "scripts/main.js"
+  ],
+  "styles": [
+    "styles/quick-info.css"
+  ]
+}
