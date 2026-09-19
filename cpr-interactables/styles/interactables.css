@@ -1,0 +1,99 @@
+.cpri-config-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.5rem;
+}
+
+.cpri-config-form .form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.cpri-config-form label {
+  font-weight: 600;
+}
+
+.cpri-hint {
+  font-weight: normal;
+  font-size: 0.8em;
+  opacity: 0.7;
+}
+
+.cpri-image-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.cpri-preview {
+  width: 3rem;
+  height: 3rem;
+  object-fit: cover;
+  border: 0.0625rem solid #444;
+  flex: none;
+}
+
+.cpri-checkbox-row label {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  font-weight: normal;
+}
+
+.cpri-config-footer {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.cpri-config-footer button {
+  flex: 1;
+}
+
+.cpri-config-delete {
+  opacity: 0.85;
+}
+
+/*
+ * The interact prompt is a bare floating <div> appended straight to
+ * document.body by hud.js, not a Foundry Application window — same
+ * technique (and the same --cprt-* theme variables, with literal
+ * fallbacks) as ../cpr-quick-info's card.
+ */
+.cpri-prompt {
+  position: fixed;
+  left: 50%;
+  bottom: 8%;
+  z-index: 90;
+  pointer-events: none;
+  padding: 0.5rem 1rem;
+  background: var(--cprt-panel, #12101f);
+  border: 0.0625rem solid var(--cprt-line, #ff3a63);
+  box-shadow: 0 0 0.75rem -0.25rem var(--cprt-hot-glow, #ff5c86);
+  font-family: var(--cprt-font-display, 'Chakra Petch', sans-serif);
+  color: var(--cprt-text, #f2e9f0);
+  font-size: 0.9375rem;
+  letter-spacing: 0.02em;
+  opacity: 0;
+  transform: translate(-50%, 0.5rem);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+
+.cpri-prompt.cpri-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.cpri-key {
+  display: inline-block;
+  min-width: 1.5em;
+  margin-right: 0.4em;
+  padding: 0.05em 0.35em;
+  text-align: center;
+  border: 0.0625rem solid var(--cprt-cyan, #3ee6ff);
+  border-radius: 0.2em;
+  color: var(--cprt-cyan, #3ee6ff);
+  font-weight: 700;
+}

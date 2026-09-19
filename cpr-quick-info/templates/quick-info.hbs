@@ -1,0 +1,42 @@
+<div class="cqi-card">
+  <div class="cqi-head">
+    <img class="cqi-portrait" src="{{img}}" alt="" />
+    <div class="cqi-head-main">
+      <div class="cqi-name{{#if nameHidden}} cqi-name-hidden{{/if}}">{{name}}</div>
+      {{#if role}}<div class="cqi-role">{{role}}</div>{{/if}}
+    </div>
+  </div>
+
+  {{#if notes}}
+    <div class="cqi-notes">{{notes}}</div>
+  {{/if}}
+
+  {{#if weapons.length}}
+    <div class="cqi-section-label">Weapons</div>
+    <div class="cqi-gear-list">
+      {{#each weapons}}
+        <div class="cqi-gear-row{{#if wielded}} cqi-gear-wielded{{/if}}">
+          <img class="cqi-gear-icon" src="{{img}}" alt="" />
+          <span class="cqi-gear-name">{{name}}</span>
+          {{#if wielded}}<span class="cqi-gear-tag">Readied</span>{{/if}}
+        </div>
+      {{/each}}
+    </div>
+  {{/if}}
+
+  {{#if cyberware.length}}
+    <div class="cqi-section-label">Cyberware</div>
+    <div class="cqi-gear-list">
+      {{#each cyberware}}
+        <div class="cqi-gear-row">
+          <img class="cqi-gear-icon" src="{{img}}" alt="" />
+          <span class="cqi-gear-name">{{name}}</span>
+        </div>
+      {{/each}}
+    </div>
+  {{/if}}
+
+  {{#unless weapons.length}}{{#unless cyberware.length}}
+    <div class="cqi-empty">No known gear.</div>
+  {{/unless}}{{/unless}}
+</div>

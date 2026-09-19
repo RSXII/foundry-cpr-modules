@@ -1,8 +1,11 @@
 // Effects applied to Foundry's OWN application chrome — the sidebar/chat
-// log, the scene navigation bar — during a netrunner intrusion. Deliberately
-// separate from vision-effect.js/overlay.js, which only ever touch the
-// canvas overlay this module draws itself: this is the first step into
-// actually reaching outside that and reacting on Foundry's real UI.
+// log, the scene navigation bar — during a netrunner intrusion, and (with
+// the same startBreach()/endBreach()) during the boot sequence's own
+// escalating shake/popup phase, so the sidebar/nav blur out right along
+// with the warning popups cascading over the canvas. Deliberately separate
+// from vision-effect.js/overlay.js, which only ever touch the canvas
+// overlay this module draws itself: this is the first step into actually
+// reaching outside that and reacting on Foundry's real UI.
 //
 // Prototype approach: an overlay technique, not direct styling. A
 // transparent, pointer-events:none <div> gets positioned exactly over each
@@ -60,6 +63,12 @@ function repositionAll() {
 }
 
 function startBreach() {
+  // Idempotent on purpose: boot's bootMainStart and an actual intrusion's
+  // intrusionStart both call this, and while the two shouldn't ever
+  // genuinely overlap in practice, a second call re-arming the poll
+  // interval on top of an already-running one would leak a timer and
+  // double up every reposition tick for no reason.
+  if (repositionTimer) return;
   for (const key of Object.keys(TARGETS)) {
     ensureOverlay(key);
     repositionOverlay(key);
@@ -85,4 +94,9 @@ function endBreach() {
 export function registerChromeEffectHooks() {
   Hooks.on(`${MODULE_ID}.intrusionStart`, startBreach);
   Hooks.on(`${MODULE_ID}.intrusionEnd`, endBreach);
+  // bootMainStart fires once the cold-open/logo-reveal lead-up is done and
+  // the shake/warning-popup escalation actually begins — not the whole
+  // boot sequence, just the part that reads as "something's going wrong."
+  Hooks.on(`${MODULE_ID}.bootMainStart`, startBreach);
+  Hooks.on(`${MODULE_ID}.bootEnd`, endBreach);
 }

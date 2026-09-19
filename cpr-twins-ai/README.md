@@ -52,6 +52,19 @@ shared "we're inside cyberspace" break; this one is the AI's own targeting
 sense laid over the real room, and the two modules don't know about each
 other or interact.
 
+## Pairs with cpr-quick-info
+
+If `../cpr-quick-info` is installed and active, turning Rogue AI Vision on
+also enables its hover-card HUD for every connected client — hover a
+non-friendly token while the AI's watching and get its at-a-glance card
+(portrait, bio, gear); turning vision off disables it again, immediately,
+even mid-hover. This is the AI handing over target info while it's already
+lending its eyes, the same beat as the vision effect itself. Optional in
+both directions: this module just reaches for
+`game.modules.get('cpr-quick-info')?.api` and no-ops if it isn't there, and
+`cpr-quick-info` works fine standalone if something else (a macro, say)
+drives its on/off switch instead — see that module's own README.
+
 ## Scope of a claim
 
 Deliberately **per token, not per actor**. Mooks are normally unlinked, so

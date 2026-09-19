@@ -1,0 +1,80 @@
+<form class="{{cssClass}} hdsfnz-sheet" autocomplete="off">
+
+  <header class="hdsfnz-sheet-header">
+    <img class="hdsfnz-sheet-portrait" src="{{actor.img}}" data-edit="img" title="{{actor.name}}">
+    <div class="hdsfnz-sheet-title">
+      <input class="hdsfnz-sheet-name" type="text" name="name" value="{{actor.name}}" placeholder="Unit Name" {{#unless editable}}disabled{{/unless}}>
+      <div class="hdsfnz-sheet-subrow">
+        <label>UNIT</label>
+        <input type="text" name="system.unitNumber" value="{{system.unitNumber}}" maxlength="2" {{#unless editable}}disabled{{/unless}}>
+        <label>CLASS</label>
+        <select name="system.class" {{#unless editable}}disabled{{/unless}}>
+          {{selectOptions classLabels selected=system.class}}
+        </select>
+      </div>
+    </div>
+  </header>
+
+  {{#if classInfo}}
+  <section class="hdsfnz-sheet-class-flavor">
+    {{#if classInfo.motto}}<div class="hdsfnz-sheet-motto">&ldquo;{{classInfo.motto}}&rdquo;</div>{{/if}}
+    <div class="hdsfnz-sheet-abilities">
+      {{#each classInfo.abilities}}<span>{{this}}</span>{{/each}}
+    </div>
+  </section>
+  {{/if}}
+
+  <section class="hdsfnz-sheet-stats">
+    <div class="hdsfnz-sheet-stat">
+      <label>HP</label>
+      <input type="number" name="system.hp.value" value="{{system.hp.value}}" {{#unless editable}}disabled{{/unless}}>
+      <span>/</span>
+      <input type="number" name="system.hp.max" value="{{system.hp.max}}" {{#unless editable}}disabled{{/unless}}>
+    </div>
+    <div class="hdsfnz-sheet-stat">
+      <label>EP</label>
+      <input type="number" name="system.ep.value" value="{{system.ep.value}}" {{#unless editable}}disabled{{/unless}}>
+      <span>/</span>
+      <input type="number" name="system.ep.max" value="{{system.ep.max}}" {{#unless editable}}disabled{{/unless}}>
+    </div>
+    <div class="hdsfnz-sheet-stat">
+      <label>STAM</label>
+      <input type="number" name="system.stam.value" value="{{system.stam.value}}" {{#unless editable}}disabled{{/unless}}>
+      <span>/</span>
+      <input type="number" name="system.stam.max" value="{{system.stam.max}}" {{#unless editable}}disabled{{/unless}}>
+    </div>
+    <div class="hdsfnz-sheet-stat">
+      <label>AMMO</label>
+      <input type="number" name="system.ammo.value" value="{{system.ammo.value}}" {{#unless editable}}disabled{{/unless}}>
+      <span>/</span>
+      <input type="number" name="system.ammo.max" value="{{system.ammo.max}}" {{#unless editable}}disabled{{/unless}}>
+    </div>
+  </section>
+
+  <section class="hdsfnz-sheet-speshal">
+    <label>SPESHAL <span class="hdsfnz-sheet-speshal-hint">???</span></label>
+    {{rangePicker name="system.speshal" value=system.speshal min=0 max=100 step=1}}
+  </section>
+
+  <section class="hdsfnz-sheet-gear">
+    <header>
+      <h3>Equipment</h3>
+      {{#if editable}}<a data-action="add-gear"><i class="fas fa-plus"></i> Add Gear</a>{{/if}}
+    </header>
+    <ul>
+      {{#each gear as |item|}}
+      <li data-item-id="{{item.id}}">
+        <select data-field="system.slot" {{#unless ../editable}}disabled{{/unless}}>
+          {{selectOptions ../gearSlotLabels selected=item.system.slot}}
+        </select>
+        <input type="text" data-field="name" value="{{item.name}}" placeholder="Name" {{#unless ../editable}}disabled{{/unless}}>
+        <input type="text" data-field="system.code" value="{{item.system.code}}" placeholder="Code" {{#unless ../editable}}disabled{{/unless}}>
+        {{#if ../editable}}<a data-action="delete-gear"><i class="fas fa-trash"></i></a>{{/if}}
+      </li>
+      {{else}}
+      <li class="hdsfnz-sheet-gear-empty">No gear yet.</li>
+      {{/each}}
+    </ul>
+  </section>
+
+</form>

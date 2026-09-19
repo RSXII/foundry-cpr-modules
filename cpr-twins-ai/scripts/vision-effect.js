@@ -499,7 +499,15 @@ export class VisionEffect {
     return this._bootActive;
   }
 
-  mount() {
+  /**
+   * `skipBoot` — for main.js's "Restart Vision (Skip Animation)" button:
+   * a GM restarting the HUD to clear up some local glitch shouldn't have
+   * to sit through the cinematic pre-roll every single time. Jumps
+   * straight to _revealHud() instead of playing _playBootSequence() at
+   * all; every other mount() caller (main.js's own ready/updateSetting
+   * hooks) leaves this at its default and gets the normal boot.
+   */
+  mount({ skipBoot = false } = {}) {
     if (this.el) return;
 
     this._canvasEl = canvas.app.view;
@@ -512,6 +520,11 @@ export class VisionEffect {
     window.addEventListener('resize', this._onResize);
     this._resizeObserver = new ResizeObserver(() => this._layout());
     this._resizeObserver.observe(this._canvasEl);
+
+    if (skipBoot) {
+      this._revealHud();
+      return;
+    }
 
     // The boot sequence plays first; the persistent HUD only reveals
     // itself once that resolves. If destroy() runs mid-boot, _bootWait()'s
@@ -577,6 +590,15 @@ export class VisionEffect {
     this._terminalQueue = [];
     if (this._intrusionTimer) clearTimeout(this._intrusionTimer);
     this._intrusionTimer = null;
+    // Abrupt teardown mid-intrusion/mid-boot (mode toggled off) wouldn't
+    // otherwise fire these — normal completion already does (see
+    // _endIntrusion() and _playBootSequence()'s own resolve path), so
+    // these only actually fire here for the "cut short" case. Without
+    // them, overlay.js's outline flicker and chrome-effects.js's
+    // sidebar/nav blur would both be stuck on with nothing left running
+    // to ever turn them back off.
+    if (this._intrusionHandle) Hooks.callAll(`${MODULE_ID}.intrusionEnd`);
+    if (this._bootActive) Hooks.callAll(`${MODULE_ID}.bootEnd`);
     this._intrusionHandle = null;
     this._intrusionKind = null;
     this._stopAmbientTerminal();
@@ -920,6 +942,11 @@ export class VisionEffect {
     await this._playLogoReveal();
     if (!this.el) return; // destroy() ran mid-boot
     this._bootEl.classList.remove('cold');
+    // chrome-effects.js listens for this to start the same sidebar/nav
+    // blur the netrunner intrusion uses — the escalating shake/popup
+    // phase is about to start below, this is where it should kick in,
+    // not the whole cold-open/logo-reveal lead-up before it.
+    Hooks.callAll(`${MODULE_ID}.bootMainStart`);
 
     const durationMs = BOOT_MAIN_DURATION_MS;
     const startTime = performance.now();

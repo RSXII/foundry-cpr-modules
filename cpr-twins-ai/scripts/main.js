@@ -12,6 +12,22 @@ import { visionEffect } from './vision-effect.js';
 
 const CONTROL_LAYER_NAME = 'cprTwinsAiLayer';
 
+// Optional pairing, not a hard dependency — cpr-quick-info starts disabled
+// with no toggle of its own (see its main.js) and expects something else to
+// drive it. Rogue AI Vision is "the AI is scanning the room for you," so
+// the AI also handing over at-a-glance target info while that's on is the
+// same beat; this just reaches for the other module's api if it's active
+// and no-ops otherwise, the same guard style as weapon-shooter.js's check
+// for cyberpunk-red-vehicles.
+const QUICK_INFO_MODULE_ID = 'cpr-quick-info';
+
+function syncQuickInfoHud(enabled) {
+  const api = game.modules.get(QUICK_INFO_MODULE_ID)?.api;
+  if (!api) return;
+  if (enabled) api.enable();
+  else api.disable();
+}
+
 // The scene-control group below has no real canvas tool of its own, only
 // the mode toggle — Foundry's scene-control click handler only re-renders
 // the toolbar when the click causes a genuine layer transition. Registering
@@ -83,6 +99,7 @@ Hooks.once('init', () => {
 // mode is already on.
 Hooks.once('ready', () => {
   if (isModeEnabled()) visionEffect.mount();
+  syncQuickInfoHud(isModeEnabled());
 });
 
 Hooks.on('canvasReady', () => visionEffect.refreshChips());
@@ -165,6 +182,24 @@ Hooks.on('getSceneControlButtons', (controls) => {
         button: true,
         onClick: () => triggerUnknownIntrusion(),
       },
+      // For clearing up some local glitch on this client without making
+      // everyone sit through the ~10s cinematic pre-roll again — mount()
+      // itself only skips the boot sequence when explicitly told to
+      // (skipBoot), every other caller of it still gets the normal one.
+      {
+        name: 'restart-vision-skip-boot',
+        title: 'Restart Vision (Skip Animation)',
+        icon: 'fa-solid fa-rotate-right',
+        button: true,
+        onClick: () => {
+          if (!isModeEnabled()) {
+            ui.notifications.warn('Turn on the Rogue AI Vision mode first.');
+            return;
+          }
+          visionEffect.destroy();
+          visionEffect.mount({ skipBoot: true });
+        },
+      },
     ],
   };
 
@@ -179,5 +214,6 @@ Hooks.on('updateSetting', (setting) => {
   if (setting.key !== `${MODULE_ID}.modeEnabled`) return;
   if (isModeEnabled()) visionEffect.mount();
   else visionEffect.destroy();
+  syncQuickInfoHud(isModeEnabled());
   if (game.user.isGM) ui.controls.render();
 });

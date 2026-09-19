@@ -1,0 +1,29 @@
+{
+  "id": "hdsfnz",
+  "title": "HDSFNZ Scene HUD",
+  "description": "Adds a lightweight character type (class, HP/EP/STAM/AMMO, equipment) for the in-fiction FC99 side-game 'Hyper Demon Strike Force Negative Zero,' plus a full-screen retro console-RPG HUD overlay that skins a scene for playing an episode. GM toggles it per-scene; it mounts for every client over the canvas viewport without blocking token selection or the sidebar.",
+  "version": "0.1.0",
+  "compatibility": {
+    "minimum": "12",
+    "verified": "12"
+  },
+  "authors": [
+    {
+      "name": "Ryan Schultz"
+    }
+  ],
+  "esmodules": [
+    "scripts/main.js"
+  ],
+  "styles": [
+    "styles/hdsfnz.css"
+  ],
+  "documentTypes": {
+    "Actor": {
+      "character": {}
+    },
+    "Item": {
+      "gear": {}
+    }
+  }
+}

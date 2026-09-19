@@ -1,0 +1,145 @@
+/*
+ * The card is a bare floating <div> appended straight to document.body by
+ * hud.js, not a Foundry Application window — so unlike cpr-relations' quick
+ * view, it doesn't get the theme module's free `.application` chrome
+ * (border/glow/clip-path) for nothing. This file supplies that chrome
+ * itself, reusing the same --cprt-* variables (with the same literal
+ * fallbacks) so it still matches the rest of the table's look, themed or
+ * not.
+ *
+ * pointer-events: none throughout — this card is a passive readout that
+ * trails the mouse via token hover, not something to click. Anything
+ * clickable here would also risk intercepting the hover it depends on.
+ */
+
+.cqi-card {
+  position: fixed;
+  z-index: 90;
+  pointer-events: none;
+  width: 17rem;
+  padding: 0.75rem;
+  background: var(--cprt-panel, #12101f);
+  border: 0.0625rem solid var(--cprt-line-dim, #8a1f38);
+  box-shadow: 0 0 0.75rem -0.25rem var(--cprt-hot-glow, #ff5c86);
+  font-family: var(--cprt-font-mono, 'JetBrains Mono', monospace);
+  color: var(--cprt-text, #f2e9f0);
+}
+
+.cqi-head {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.cqi-portrait {
+  flex: none;
+  width: 3rem;
+  height: 3rem;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 0.125rem solid var(--cprt-line, #ff3a63);
+  background: var(--cprt-panel2, #181530);
+}
+
+.cqi-head-main {
+  min-width: 0;
+}
+
+.cqi-name {
+  font-family: var(--cprt-font-display, 'Chakra Petch', sans-serif);
+  font-weight: 700;
+  font-size: 1.0625rem;
+  letter-spacing: 0.02em;
+  color: var(--cprt-hot, #ff2a5c);
+  text-shadow: 0 0 0.375rem var(--cprt-hot-dim, #b3123a);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cqi-name.cqi-name-hidden {
+  color: var(--cprt-text-mute, #6b4e5a);
+  text-shadow: none;
+  font-style: italic;
+}
+
+.cqi-role {
+  font-size: 0.75rem;
+  color: var(--cprt-cyan, #3ee6ff);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.cqi-notes {
+  margin-top: 0.5rem;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  font-style: italic;
+  color: var(--cprt-text-dim, #a88a97);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+}
+
+.cqi-section-label {
+  margin-top: 0.625rem;
+  margin-bottom: 0.25rem;
+  font-family: var(--cprt-font-display, 'Chakra Petch', sans-serif);
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--cprt-text-mute, #6b4e5a);
+  border-bottom: 0.0625rem solid var(--cprt-line-dim, #8a1f38);
+  padding-bottom: 0.1875rem;
+}
+
+.cqi-gear-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.cqi-gear-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4375rem;
+}
+
+.cqi-gear-icon {
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  object-fit: cover;
+  border: 0.0625rem solid var(--cprt-line-dim, #8a1f38);
+  background: var(--cprt-panel2, #181530);
+}
+
+.cqi-gear-name {
+  font-size: 0.8125rem;
+  color: var(--cprt-text, #f2e9f0);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+.cqi-gear-wielded .cqi-gear-name {
+  color: var(--cprt-yellow, #e8c93f);
+}
+
+.cqi-gear-tag {
+  flex: none;
+  font-size: 0.625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--cprt-yellow, #e8c93f);
+  border: 0.0625rem solid var(--cprt-yellow, #e8c93f);
+  padding: 0.0625rem 0.25rem;
+}
+
+.cqi-empty {
+  margin-top: 0.625rem;
+  font-size: 0.8125rem;
+  color: var(--cprt-text-mute, #6b4e5a);
+}
