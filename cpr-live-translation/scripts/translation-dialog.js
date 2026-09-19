@@ -73,6 +73,7 @@ export function openTranslationDialog() {
             {
               cues,
               position: game.settings.get(MODULE_ID, "position"),
+              fontSize: game.settings.get(MODULE_ID, "fontSize"),
               charSpeed: game.settings.get(MODULE_ID, "charSpeed"),
               sourceHoldTime: game.settings.get(MODULE_ID, "sourceHoldTime"),
               holdTime: game.settings.get(MODULE_ID, "holdTime"),

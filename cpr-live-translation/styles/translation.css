@@ -33,7 +33,7 @@
 
 .cpr-translation-line {
   font-family: "Courier New", monospace;
-  font-size: 20px;
+  font-size: var(--cpr-translation-font-size, 28px);
   line-height: 1.4;
   color: #eafcff;
   text-shadow:
