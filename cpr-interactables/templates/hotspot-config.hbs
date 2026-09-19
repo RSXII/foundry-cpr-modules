@@ -1,0 +1,42 @@
+<form class="cpri-config-form">
+  <div class="form-group">
+    <label>Image</label>
+    <div class="cpri-image-row">
+      <img class="cpri-preview" data-preview src="{{img}}" {{#unless img}}style="display:none;"{{/unless}} />
+      <button type="button" data-action="pick-image">
+        <i class="fa-solid fa-file-image"></i> Choose Image
+      </button>
+    </div>
+    <input type="hidden" name="img" value="{{img}}" />
+  </div>
+
+  <div class="form-group">
+    <label>Caption <span class="cpri-hint">(shown as the view's title)</span></label>
+    <input type="text" name="caption" value="{{caption}}" placeholder="e.g. Missing Person Flyer" />
+  </div>
+
+  <div class="form-group">
+    <label>Trigger Radius <span class="cpri-hint">(grid squares)</span></label>
+    <input type="number" name="radius" value="{{radius}}" min="0.25" step="0.25" />
+  </div>
+
+  <div class="form-group cpri-checkbox-row">
+    <label>
+      <input type="checkbox" name="showIndicator" {{#if showIndicator}}checked{{/if}} />
+      Show a sparkle marker to players
+      <span class="cpri-hint">(off for a hidden/secret hotspot)</span>
+    </label>
+  </div>
+
+  <footer class="cpri-config-footer">
+    {{#unless isNew}}
+      <button type="button" data-action="delete" class="cpri-config-delete">
+        <i class="fa-solid fa-trash"></i> Delete
+      </button>
+    {{/unless}}
+    <button type="button" data-action="cancel">Cancel</button>
+    <button type="button" data-action="save">
+      <i class="fa-solid fa-check"></i> Save
+    </button>
+  </footer>
+</form>

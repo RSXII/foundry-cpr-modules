@@ -24,6 +24,15 @@
         "C:/Users/ryans/AppData/Local/Temp/claude/C--Users-ryans-git-foundry-cpr-modules/1d5dcace-4a6b-4d08-a266-476a9fd006bc/scratchpad"
       ],
       "port": 8743
+    },
+    {
+      "name": "foundry",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "C:/Program Files/Foundry Virtual Tabletop/resources/app/main.js",
+        "--dataPath=C:/Users/ryans/AppData/Local/FoundryVTT"
+      ],
+      "port": 30000
     }
   ]
 }

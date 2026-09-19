@@ -21,6 +21,13 @@
           "minimum": "0.92.0"
         }
       }
+    ],
+    "recommends": [
+      {
+        "id": "cpr-quick-info",
+        "type": "module",
+        "reason": "Rogue AI Vision mode turns its hover cards on/off automatically. Not required — this module works fine without it."
+      }
     ]
   },
   "esmodules": [

@@ -1,0 +1,321 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@600;800&family=Share+Tech+Mono&display=swap');
+
+/* ==========================================================================
+   Scene HUD overlay — ported from hdsfnz-hud-mockup.html.
+   Mounted as the last child of Foundry's own #ui-middle (see hud.js) —
+   already exactly the gap between the scene-control rail and the sidebar,
+   and already stacked above canvas#board. position:absolute here is what
+   actually keeps this above #ui-top/#ui-bottom (Foundry's scene-nav bar
+   and hotbar, both plain-flow siblings): an absolutely positioned element
+   paints above static-flow siblings regardless of z-index or DOM order, so
+   no z-index tug-of-war with Foundry's own chrome is needed.
+   pointer-events stays off end-to-end (root and every descendant) — #ui-
+   middle is pointer-events:none by Foundry's own design so canvas clicks
+   fall through the gaps in its UI, and this HUD has nothing interactive
+   yet (decorative nav/minimap, per the design handoff), so every click
+   simply passes through to the token/canvas underneath exactly as if the
+   HUD weren't mounted at all.
+   ========================================================================== */
+
+#hdsfnz-hud{
+  position:fixed;
+  inset:0;
+  z-index:10;
+  pointer-events:none;
+  overflow:hidden;
+  font-family:'Share Tech Mono', monospace;
+  color: var(--hdsfnz-text);
+
+  --hdsfnz-panel: rgba(4, 8, 16, 0.96);
+  --hdsfnz-cyan: #35d9ff;
+  --hdsfnz-cyan-dim: #1a6b82;
+  --hdsfnz-magenta: #ff2f7e;
+  --hdsfnz-hp: #ff3b5c;
+  --hdsfnz-ep: #35c6ff;
+  --hdsfnz-stam: #33ffb0;
+  --hdsfnz-ammo: #ffcf3b;
+  --hdsfnz-text-dim: #7fa8c9;
+  --hdsfnz-text: #d9f4ff;
+}
+
+#hdsfnz-hud .hdsfnz-display{ font-family:'Orbitron', sans-serif; }
+
+.hdsfnz-stage{
+  position:relative;
+  width:100%; height:100%;
+  display:grid;
+  /* Wide enough on both sides to run past Foundry's own control-icon rail
+     (left) and butt up against the sidebar's own 300px width (right) —
+     deliberately eating into the screen rather than hugging the gap
+     between them (see hud.js's mount-point comment). Rows are taller than
+     a minimal-chrome HUD needs for the same reason: a heavier frame that
+     visibly shrinks the play area, not a thin strip around it. */
+  grid-template-columns: 300px 1fr 300px;
+  grid-template-rows: 130px 1fr 220px;
+  grid-template-areas:
+    "header header header"
+    "left   center  right"
+    "bottom bottom  bottom";
+  gap: 6px;
+}
+
+/* ---------- shared panel chrome ---------- */
+.hdsfnz-panel{
+  position:relative;
+  background: var(--hdsfnz-panel);
+  border: 1px solid var(--hdsfnz-cyan-dim);
+  box-shadow: 0 0 22px rgba(0,0,0,.5), inset 0 0 30px rgba(53,217,255,.03);
+}
+.hdsfnz-panel::before, .hdsfnz-panel::after{
+  content:""; position:absolute; width:18px; height:18px;
+  border: 3px solid var(--hdsfnz-cyan);
+  filter: drop-shadow(0 0 4px var(--hdsfnz-cyan));
+  animation: hdsfnzBracketPulse 3s ease-in-out infinite;
+}
+.hdsfnz-panel::before{ top:-2px; left:-2px; border-right:none; border-bottom:none; }
+.hdsfnz-panel::after{ bottom:-2px; right:-2px; border-left:none; border-top:none; animation-delay: -1.5s; }
+@keyframes hdsfnzBracketPulse{ 0%,100%{ opacity:.75; } 50%{ opacity:1; } }
+
+/* Thin light sweep across the whole stage, including the transparent
+   center — echoes the original mockup's per-panel scanline but as one
+   subtle full-HUD pass instead of confined to the canvas hole. Low enough
+   opacity that it never meaningfully dims the real canvas underneath. */
+.hdsfnz-scanline{
+  position:absolute; left:0; right:0; height:2px;
+  background: linear-gradient(90deg, transparent, rgba(53,217,255,.35), transparent);
+  animation: hdsfnzScan 7s linear infinite;
+  z-index:1;
+}
+@keyframes hdsfnzScan{ 0%{ top:0%; } 100%{ top:100%; } }
+
+.hdsfnz-panel-title{
+  font-family:'Orbitron', sans-serif;
+  font-size:12px; font-weight:700; letter-spacing:.08em;
+  color: var(--hdsfnz-cyan);
+  padding: 8px 12px 4px;
+  display:flex; align-items:baseline; gap:6px;
+}
+.hdsfnz-panel-title .hdsfnz-slash{ color: var(--hdsfnz-magenta); }
+
+/* ---------- header ---------- */
+.hdsfnz-header{
+  grid-area: header;
+  position:relative;
+  display:flex; align-items:center; justify-content:space-between;
+  padding: 8px 20px;
+  overflow:hidden;
+  background:
+    radial-gradient(ellipse 60% 140% at 78% 30%, rgba(255,47,126,.16), transparent 70%),
+    linear-gradient(180deg, rgba(8,14,26,.92), rgba(6,10,20,.7));
+  border-bottom: 1px solid var(--hdsfnz-cyan-dim);
+}
+.hdsfnz-title-block{ position:relative; z-index:1; }
+.hdsfnz-title-block .hdsfnz-jp{
+  font-family:'Orbitron', sans-serif;
+  font-size: 23px; font-weight:800; letter-spacing:.02em;
+  color: var(--hdsfnz-magenta);
+  text-shadow: 0 0 8px rgba(255,47,126,.85), 0 0 20px rgba(255,47,126,.5), 0 0 40px rgba(255,47,126,.25);
+}
+.hdsfnz-accent{
+  background: linear-gradient(90deg, var(--hdsfnz-cyan), #9fe8ff 60%, var(--hdsfnz-cyan));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 0 6px rgba(53,217,255,.8));
+}
+.hdsfnz-title-block .hdsfnz-en{ font-size: 11px; letter-spacing:.18em; color: var(--hdsfnz-cyan); margin-top: 3px; text-shadow: 0 0 6px rgba(53,217,255,.5); }
+.hdsfnz-title-block .hdsfnz-sub{ font-size: 10px; letter-spacing:.12em; color: var(--hdsfnz-text-dim); }
+.hdsfnz-header-accent{ position:relative; z-index:1; display:flex; flex-direction:column; gap:5px; margin:0 22px; }
+.hdsfnz-header-accent span{
+  display:block; width:110px; height:2px;
+  background: linear-gradient(90deg, transparent, var(--hdsfnz-cyan), transparent);
+  box-shadow: 0 0 8px var(--hdsfnz-cyan);
+}
+.hdsfnz-header-accent span:nth-child(2){ width:80px; opacity:.7; }
+.hdsfnz-header-accent span:nth-child(3){ width:50px; opacity:.45; }
+.hdsfnz-motto{ position:relative; z-index:1; text-align:right; font-size:11px; line-height:1.5; color: var(--hdsfnz-text-dim); }
+.hdsfnz-motto .hdsfnz-jp-line{ color: var(--hdsfnz-text); }
+
+/* ---------- left rail ---------- */
+.hdsfnz-left{ grid-area:left; display:flex; flex-direction:column; }
+.hdsfnz-area-label{ padding: 10px 12px 0; display:flex; align-items:center; gap:8px; }
+.hdsfnz-emblem{ width:22px; height:22px; flex:none; color: var(--hdsfnz-magenta); filter: drop-shadow(0 0 5px rgba(255,47,126,.7)); }
+.hdsfnz-area-label .hdsfnz-en{ font-family:'Orbitron',sans-serif; font-size:13px; color: var(--hdsfnz-cyan); letter-spacing:.05em; text-shadow: 0 0 6px rgba(53,217,255,.4); }
+.hdsfnz-area-label .hdsfnz-jp{ font-size:11px; color: var(--hdsfnz-text-dim); margin-top:2px; }
+
+.hdsfnz-menu{ list-style:none; margin: 12px 0 0; padding:0; }
+.hdsfnz-menu li{
+  padding: 9px 14px; font-size:12px; letter-spacing:.06em;
+  border-left: 3px solid transparent;
+  color: var(--hdsfnz-text-dim);
+  display:flex; align-items:center; gap:8px;
+}
+.hdsfnz-menu li .hdsfnz-arrow{ color: var(--hdsfnz-magenta); opacity:0; font-size:10px; }
+.hdsfnz-menu li.active{
+  background: rgba(255,47,126,0.12);
+  border-left-color: var(--hdsfnz-magenta);
+  color: var(--hdsfnz-text);
+}
+.hdsfnz-menu li.active .hdsfnz-arrow{ opacity:1; }
+
+.hdsfnz-minimap{
+  margin: auto 10px 10px;
+  height: 130px;
+  background: #060c16;
+  border: 1px solid var(--hdsfnz-cyan-dim);
+  position:relative;
+  background-image:
+    linear-gradient(rgba(53,217,255,.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(53,217,255,.08) 1px, transparent 1px);
+  background-size: 14px 14px;
+}
+.hdsfnz-compass{
+  position:absolute; top:4px; left:0; right:0;
+  display:flex; justify-content:center; gap:14px;
+  font-size:8px; color: var(--hdsfnz-text-dim); letter-spacing:.1em;
+}
+.hdsfnz-minimap-path{
+  position:absolute; left:20px; top:40px; width:60px; height:60px;
+  border-left:2px solid var(--hdsfnz-cyan-dim); border-bottom:2px solid var(--hdsfnz-cyan-dim);
+}
+.hdsfnz-player-arrow{
+  position:absolute; bottom:24px; left:38px;
+  width:0; height:0;
+  border-left:6px solid transparent; border-right:6px solid transparent;
+  border-bottom:10px solid var(--hdsfnz-magenta);
+  filter: drop-shadow(0 0 4px var(--hdsfnz-magenta));
+}
+
+/* ---------- center: intentionally empty — the real canvas shows through here ---------- */
+.hdsfnz-center{ grid-area:center; }
+
+/* ---------- right rail ---------- */
+.hdsfnz-right{
+  grid-area:right; display:flex; flex-direction:column; gap:10px;
+  background: radial-gradient(ellipse 100% 60% at 50% 0%, rgba(255,47,126,.10), transparent 65%);
+}
+.hdsfnz-stat-row{ padding: 4px 14px; }
+.hdsfnz-label{
+  display:flex; justify-content:space-between; align-items:baseline;
+  font-size:11px; letter-spacing:.08em; color: var(--hdsfnz-text-dim); margin-bottom:4px;
+}
+.hdsfnz-label b{ color: var(--hdsfnz-text); font-family:'Orbitron',sans-serif; font-size:12px; text-shadow: 0 0 6px rgba(217,244,255,.4); }
+.hdsfnz-label span{ font-family:'Orbitron',sans-serif; font-size:12px; }
+.hdsfnz-bar{ height:12px; background: rgba(255,255,255,.06); position:relative; overflow:hidden; border: 1px solid rgba(255,255,255,.08); }
+.hdsfnz-bar > span{ display:block; height:100%; position:relative; }
+.hdsfnz-bar > span::after{
+  content:""; position:absolute; inset:0;
+  background: linear-gradient(180deg, rgba(255,255,255,.45), transparent 55%);
+}
+.hdsfnz-hp > span{ background: linear-gradient(90deg, var(--hdsfnz-hp), #ff7f97); box-shadow:0 0 12px var(--hdsfnz-hp), 0 0 24px rgba(255,59,92,.5); }
+.hdsfnz-ep > span{ background: linear-gradient(90deg, var(--hdsfnz-ep), #8fe4ff); box-shadow:0 0 12px var(--hdsfnz-ep), 0 0 24px rgba(53,198,255,.5); }
+.hdsfnz-stam > span{ background: linear-gradient(90deg, var(--hdsfnz-stam), #a3ffdd); box-shadow:0 0 12px var(--hdsfnz-stam), 0 0 24px rgba(51,255,176,.5); }
+.hdsfnz-ammo > span{ background: linear-gradient(90deg, var(--hdsfnz-ammo), #ffe38f); box-shadow:0 0 12px var(--hdsfnz-ammo), 0 0 24px rgba(255,207,59,.5); }
+
+.hdsfnz-condition{ padding: 4px 14px 12px; font-size:11px; letter-spacing:.06em; display:flex; align-items:center; gap:8px; }
+.hdsfnz-pulse{ width:38px; height:13px; flex:none; }
+.hdsfnz-condition--good{ color: var(--hdsfnz-stam); }
+.hdsfnz-condition--hurt{ color: var(--hdsfnz-ammo); }
+.hdsfnz-condition--critical, .hdsfnz-condition--down{ color: var(--hdsfnz-hp); }
+.hdsfnz-condition--critical .hdsfnz-pulse{ animation: hdsfnzPulseFlicker 1s steps(2, end) infinite; }
+
+@keyframes hdsfnzPulseFlicker{ 50%{ opacity:.35; } }
+
+.hdsfnz-datetime{ padding: 10px 14px 14px; border-top: 1px solid var(--hdsfnz-cyan-dim); }
+.hdsfnz-op{ font-size:11px; letter-spacing:.15em; color: var(--hdsfnz-cyan); font-family:'Orbitron',sans-serif; text-shadow: 0 0 6px rgba(53,217,255,.4); }
+.hdsfnz-flavor{ margin-top:8px; font-size:11px; color: var(--hdsfnz-text-dim); line-height:1.5; }
+
+/* ---------- bottom strip ---------- */
+.hdsfnz-bottom{ grid-area:bottom; display:grid; grid-template-columns: 190px 1fr 220px; gap:10px; }
+
+.hdsfnz-portrait{ display:flex; flex-direction:column; }
+.hdsfnz-art{
+  flex:1; margin:8px 10px 0;
+  background: linear-gradient(160deg, #3a1f22, #16121c) center / cover no-repeat;
+  border: 1px solid var(--hdsfnz-cyan-dim);
+  box-shadow: inset 0 0 30px rgba(0,0,0,.6), 0 0 12px rgba(53,217,255,.15);
+  position:relative; overflow:hidden;
+}
+.hdsfnz-art::before{
+  /* Vignette + faint scanlines over a real uploaded portrait — a no-op
+     visually when the box is still showing the empty gradient. */
+  content:""; position:absolute; inset:0;
+  background:
+    repeating-linear-gradient(180deg, rgba(0,0,0,.12) 0 1px, transparent 1px 3px),
+    radial-gradient(ellipse at 50% 100%, rgba(0,0,0,.55), transparent 60%);
+}
+.hdsfnz-art::after{
+  content:"UNIT PORTRAIT"; position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font-family:'Orbitron',sans-serif; font-size:9px; letter-spacing:.15em; color: rgba(255,255,255,.25);
+  text-align:center; padding:0 10px;
+}
+.hdsfnz-art--filled::after{ content:none; }
+.hdsfnz-name{ padding: 8px 12px 12px; font-size:11px; color: var(--hdsfnz-text-dim); line-height:1.5; }
+.hdsfnz-name b{ color: var(--hdsfnz-cyan); font-family:'Orbitron',sans-serif; display:block; font-size:13px; text-shadow: 0 0 6px rgba(53,217,255,.5); }
+
+.hdsfnz-dialogue{ display:flex; flex-direction:column; justify-content:space-between; overflow:hidden; }
+.hdsfnz-speaker{ padding:10px 16px 0; color: var(--hdsfnz-magenta); font-family:'Orbitron',sans-serif; font-size:13px; letter-spacing:.05em; }
+.hdsfnz-line{ padding: 8px 16px; font-size:13px; line-height:1.6; color: var(--hdsfnz-text); flex:1; overflow:hidden; }
+.hdsfnz-footer{
+  border-top:1px solid var(--hdsfnz-cyan-dim); padding:6px 16px;
+  font-size:10px; color: var(--hdsfnz-text-dim); letter-spacing:.05em;
+  display:flex; justify-content:space-between;
+}
+
+.hdsfnz-equip{ display:flex; flex-direction:column; }
+.hdsfnz-equip-row{ display:flex; align-items:center; gap:10px; padding: 9px 12px; border-bottom:1px solid rgba(53,217,255,.15); font-size:11px; }
+.hdsfnz-gear-icon{ width:34px; height:16px; flex:none; color: var(--hdsfnz-cyan); filter: drop-shadow(0 0 4px rgba(53,217,255,.6)); }
+.hdsfnz-equip-row .hdsfnz-slot{ color: var(--hdsfnz-text-dim); letter-spacing:.08em; }
+.hdsfnz-equip-row .hdsfnz-item{ color: var(--hdsfnz-text); font-family:'Orbitron',sans-serif; font-size:11px; margin-left:auto; }
+.hdsfnz-speshal{ margin-top:auto; padding: 10px 12px 12px; }
+.hdsfnz-speshal-label{ font-size:10px; letter-spacing:.1em; color: var(--hdsfnz-magenta); margin-bottom:4px; display:flex; justify-content:space-between; text-shadow: 0 0 6px rgba(255,47,126,.5); }
+.hdsfnz-speshal .hdsfnz-bar{ height:11px; }
+.hdsfnz-speshal .hdsfnz-bar > span{ background: linear-gradient(90deg, var(--hdsfnz-magenta), #ff8fc0); box-shadow:0 0 12px var(--hdsfnz-magenta), 0 0 26px rgba(255,47,126,.5); }
+
+/* ==========================================================================
+   Character sheet — same palette, plain form layout rather than the HUD
+   grid. Scoped to .hdsfnz-sheet (the sheet's own window chrome stays
+   Foundry-default; only the sheet body gets the reskin).
+   ========================================================================== */
+
+.hdsfnz-sheet{
+  font-family:'Share Tech Mono', monospace;
+  background: #04060d;
+  color: #d9f4ff;
+  padding: 10px;
+  display:flex; flex-direction:column; gap:10px;
+}
+.hdsfnz-sheet input, .hdsfnz-sheet select{
+  background: rgba(255,255,255,.06);
+  border: 1px solid #1a6b82;
+  color: #d9f4ff;
+  font-family: inherit;
+  padding: 2px 6px;
+}
+.hdsfnz-sheet-header{ display:flex; gap:10px; align-items:flex-start; }
+.hdsfnz-sheet-portrait{ width:72px; height:72px; object-fit:cover; border: 1px solid #1a6b82; cursor:pointer; }
+.hdsfnz-sheet-title{ flex:1; display:flex; flex-direction:column; gap:6px; }
+.hdsfnz-sheet-name{ font-family:'Orbitron',sans-serif; font-size:16px; }
+.hdsfnz-sheet-subrow{ display:flex; align-items:center; gap:6px; font-size:11px; letter-spacing:.08em; color:#7fa8c9; }
+.hdsfnz-sheet-subrow input{ width:32px; }
+
+.hdsfnz-sheet-class-flavor{ border: 1px solid #1a6b82; padding: 8px 10px; background: rgba(6,12,24,.6); }
+.hdsfnz-sheet-motto{ color:#ff2f7e; font-size:12px; margin-bottom:4px; }
+.hdsfnz-sheet-abilities{ display:flex; gap:8px; flex-wrap:wrap; font-size:10px; letter-spacing:.06em; color:#35d9ff; }
+
+.hdsfnz-sheet-stats{ display:grid; grid-template-columns: repeat(4, 1fr); gap:8px; }
+.hdsfnz-sheet-stat{ display:flex; flex-direction:column; gap:3px; border:1px solid #1a6b82; padding:6px; }
+.hdsfnz-sheet-stat label{ font-size:10px; letter-spacing:.08em; color:#7fa8c9; }
+.hdsfnz-sheet-stat{ flex-direction:row; align-items:center; flex-wrap:wrap; }
+.hdsfnz-sheet-stat input{ width:44px; }
+
+.hdsfnz-sheet-speshal{ display:flex; align-items:center; gap:10px; }
+.hdsfnz-sheet-speshal label{ font-size:10px; letter-spacing:.1em; color:#ff2f7e; }
+.hdsfnz-sheet-speshal-hint{ opacity:.6; }
+
+.hdsfnz-sheet-gear header{ display:flex; justify-content:space-between; align-items:center; }
+.hdsfnz-sheet-gear h3{ margin:0; font-family:'Orbitron',sans-serif; font-size:12px; letter-spacing:.08em; color:#35d9ff; }
+.hdsfnz-sheet-gear a{ color:#35d9ff; font-size:11px; cursor:pointer; }
+.hdsfnz-sheet-gear ul{ list-style:none; margin:6px 0 0; padding:0; display:flex; flex-direction:column; gap:4px; }
+.hdsfnz-sheet-gear li{ display:flex; gap:6px; align-items:center; }
+.hdsfnz-sheet-gear li input[type="text"]{ flex:1; }
+.hdsfnz-sheet-gear li a{ color:#ff3b5c; }
+.hdsfnz-sheet-gear-empty{ color:#7fa8c9; font-size:11px; }

@@ -40,6 +40,16 @@ export function isModeEnabled() {
   return !!game.settings.get(MODULE_ID, 'modeEnabled');
 }
 
+/** True for as long as the cache-corruption event (see cache-corruption.js) has a chip locked. World-scoped, same sync mechanism as modeEnabled — every client sees the same value without a relay message. */
+export function isCacheCorrupted() {
+  return !!game.settings.get(MODULE_ID, 'cacheCorrupted');
+}
+
+/** MAX_ACTIVE_LINKS minus one while the cache is corrupted — what grantControl() actually enforces, and what the chip row visually reflects. */
+export function effectiveMaxActiveLinks() {
+  return isCacheCorrupted() ? MAX_ACTIVE_LINKS - 1 : MAX_ACTIVE_LINKS;
+}
+
 /** The id of the user currently controlling `tokenDoc`, or null if unclaimed. Stored on the token, not the actor — see grantControl(). */
 export function controllerOf(tokenDoc) {
   return tokenDoc?.getFlag(MODULE_ID, 'controlledBy') ?? null;
@@ -68,16 +78,18 @@ export function claimedTokensOnScene(scene = canvas.scene) {
  * make future-placed tokens of this actor spawn pre-owned.
  *
  * Returns true on an actual grant, false if it refused (not the GM, or the
- * scene's already at MAX_ACTIVE_LINKS) — callers need this to know whether
- * to report success, since a refusal is otherwise silent. Checked here,
- * not just at the request-handling layer in socket.js, so this stays true
+ * scene's already at capacity) — callers need this to know whether to
+ * report success, since a refusal is otherwise silent. Checked here, not
+ * just at the request-handling layer in socket.js, so this stays true
  * regardless of caller: two requests landing close enough together to both
  * pass socket.js's own pre-check would otherwise both grant, since that
- * check alone can't see the other one's write.
+ * check alone can't see the other one's write. Enforces
+ * effectiveMaxActiveLinks(), not the raw MAX_ACTIVE_LINKS ceiling — one
+ * fewer while the cache is corrupted (see cache-corruption.js).
  */
 export async function grantControl(tokenDoc, userId) {
   if (!game.user.isGM) return false;
-  if (claimedTokensOnScene(tokenDoc.parent).length >= MAX_ACTIVE_LINKS) return false;
+  if (claimedTokensOnScene(tokenDoc.parent).length >= effectiveMaxActiveLinks()) return false;
   if (tokenDoc.actorLink) {
     await tokenDoc.actor.update({ [`ownership.${userId}`]: OWNERSHIP.OWNER });
     await tokenDoc.setFlag(MODULE_ID, 'controlledBy', userId);
