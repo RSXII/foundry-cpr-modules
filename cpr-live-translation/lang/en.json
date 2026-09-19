@@ -17,6 +17,8 @@
     "SettingPositionHint": "Where the translation subtitle bar appears on screen.",
     "PositionTop": "Top",
     "PositionBottom": "Bottom",
+    "SettingFontSize": "Text Size",
+    "SettingFontSizeHint": "Font size, in pixels, of the translation subtitle text.",
     "SettingCharSpeed": "Decrypt Speed",
     "SettingCharSpeedHint": "Milliseconds per character while the line decrypts into English. Lower is faster.",
     "SettingSourceHoldTime": "Source Text Hold",

@@ -17,6 +17,16 @@ Hooks.once("init", () => {
     default: "bottom",
   });
 
+  game.settings.register(MODULE_ID, "fontSize", {
+    name: "CPR_TRANSLATION.SettingFontSize",
+    hint: "CPR_TRANSLATION.SettingFontSizeHint",
+    scope: "world",
+    config: true,
+    type: Number,
+    range: { min: 14, max: 60, step: 2 },
+    default: 28,
+  });
+
   game.settings.register(MODULE_ID, "charSpeed", {
     name: "CPR_TRANSLATION.SettingCharSpeed",
     hint: "CPR_TRANSLATION.SettingCharSpeedHint",

@@ -30,6 +30,7 @@ settled English text.
 Under this module's settings (world scope, GM only):
 
 - **Overlay Position** — top or bottom of screen.
+- **Text Size** — font size, in pixels, of the subtitle text.
 - **Decrypt Speed** — ms per character while a line is translating in.
 - **Source Text Hold** — ms the original, untranslated source text is shown
   before the decrypt effect begins.
@@ -49,6 +50,7 @@ game.modules.get("cpr-live-translation").api.trigger({
     { source: "Nova omedeto.", english: "Congratulations, nova." },
   ],
   position: "bottom",       // optional, defaults to the world setting
+  fontSize: 28,             // optional, subtitle font size in pixels
   charSpeed: 55,            // optional, ms per character while decrypting
   sourceHoldTime: 1800,     // optional, ms to show the plain source text first
   holdTime: 4000,           // optional, ms to hold each settled line

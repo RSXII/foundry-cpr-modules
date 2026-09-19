@@ -72,14 +72,15 @@ export class TranslationEffect {
    * @param {object} data
    * @param {{source: string, english: string}[]} data.cues
    * @param {"top"|"bottom"} [data.position]
+   * @param {number} [data.fontSize]        subtitle font size in pixels
    * @param {number} [data.charSpeed]       ms per character while decrypting
    * @param {number} [data.sourceHoldTime]  ms to show the plain, untranslated source text before decrypting starts
    * @param {number} [data.holdTime]        ms to hold the settled english line before clearing/advancing
    */
-  static async play({ cues, position = "bottom", charSpeed = 55, sourceHoldTime = 1800, holdTime = 4000 } = {}) {
+  static async play({ cues, position = "bottom", fontSize = 28, charSpeed = 55, sourceHoldTime = 1800, holdTime = 4000 } = {}) {
     if (!cues?.length) return;
 
-    const overlay = this._buildOverlay(position);
+    const overlay = this._buildOverlay(position, fontSize);
     const state = { skip: false };
     const onClick = () => { state.skip = true; };
     overlay.addEventListener("click", onClick);
@@ -95,11 +96,12 @@ export class TranslationEffect {
     }
   }
 
-  static _buildOverlay(position) {
+  static _buildOverlay(position, fontSize) {
     document.getElementById(OVERLAY_ID)?.remove();
     const el = document.createElement("div");
     el.id = OVERLAY_ID;
     el.className = `cpr-translation-overlay position-${position}`;
+    el.style.setProperty("--cpr-translation-font-size", `${fontSize}px`);
     el.innerHTML = `<div class="cpr-translation-line"></div>`;
     document.body.appendChild(el);
     requestAnimationFrame(() => el.classList.add("visible"));
