@@ -140,6 +140,30 @@ Three small, targeted edits, made with the project owner's go-ahead:
   decorative — leaving both would have stacked a second, dead toast on top
   of the real one for the same event.
 
+## Positioning notes
+
+Both floating pieces measure Foundry's actual `#sidebar` element rather
+than assuming a fixed width or centering against the full browser window —
+`window.innerWidth`/`50%` include the sidebar's own width, which visibly
+pulls anything naively centered or right-anchored toward (or under) the
+sidebar on any window wider than the sidebar makes obvious:
+
+- **The card** (`call-card.js`, `positionCard()`) anchors to the
+  bottom-right, offset from the true viewport edges by the sidebar's and
+  hotbar's measured widths/heights. This one was correct from the start —
+  the math subtracts the sidebar's width as a delta, which happens to cancel
+  out regardless of total window width.
+- **The ringing toast** (`ringing-toast.js`, `positionToast()`) centers
+  within the "safe area" — the canvas + left toolbar region, to the left of
+  the sidebar — not the full window. This one *wasn't* right initially: it
+  shipped with a plain CSS `left: 50%`, which centers across the whole
+  window including the sidebar, visibly shoving the toast rightward (found
+  via the browser's own DevTools element inspector — the toast was
+  rendering well right of the safe area's actual midpoint, confirmed by its
+  highlighted bounding box sitting up against the sidebar). Fixed to
+  measure `#sidebar` the same way the card already did, recomputing on
+  resize while a toast is showing.
+
 ## Known gaps (v1)
 
 - **The ops console doesn't learn about Answer/Reject/Hang Up.** The bridge

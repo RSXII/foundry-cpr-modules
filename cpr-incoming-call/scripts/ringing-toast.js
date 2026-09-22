@@ -26,11 +26,31 @@ function iconSvg(rotated) {
   </svg>`;
 }
 
+// Centers the toast in the "safe area" — the canvas + left toolbar region,
+// excluding the chat sidebar — not in the full browser viewport. A plain
+// `left: 50%` centers across the *whole* window including the sidebar's
+// own width, which pulls the toast visibly rightward, toward (or under)
+// the sidebar itself, on anything wider than a narrow window. Same
+// sidebar-measuring idea call-card.js's positionCard() already uses for
+// the card's corner offset, just applied to a centered element instead of
+// a right-anchored one. Falls back to true viewport centering if #sidebar
+// can't be found.
+function positionToast(el) {
+  const sidebar = document.getElementById('sidebar');
+  const safeAreaWidth = sidebar ? sidebar.getBoundingClientRect().left : window.innerWidth;
+  el.style.setProperty('--cpr-ring-left', `${safeAreaWidth / 2}px`);
+}
+
 let toastEl = null;
+let resizeHandler = null;
 
 export function hideToast() {
   const el = toastEl;
   if (!el) return;
+  if (resizeHandler) {
+    window.removeEventListener('resize', resizeHandler);
+    resizeHandler = null;
+  }
   el.classList.remove('cpr-ring-visible');
   setTimeout(() => el.remove(), 350);
   toastEl = null;
@@ -80,6 +100,15 @@ export function showToast(mode, payload, handlers = {}) {
   if (isFirstShow) {
     document.body.appendChild(el);
     toastEl = el;
+    positionToast(el);
+
+    let resizeDebounce;
+    resizeHandler = () => {
+      clearTimeout(resizeDebounce);
+      resizeDebounce = setTimeout(() => positionToast(el), 100);
+    };
+    window.addEventListener('resize', resizeHandler);
+
     requestAnimationFrame(() => el.classList.add('cpr-ring-visible'));
   }
 }

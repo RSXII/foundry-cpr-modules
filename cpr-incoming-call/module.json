@@ -2,7 +2,7 @@
   "id": "cpr-incoming-call",
   "title": "CPR Incoming Call",
   "description": "Cyberpunk-style call handling for Foundry: a top-of-screen ringing toast with Answer/Reject, and a full connection card once answered, driven by the Fate City bridge's call.incoming/call.ended events.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "compatibility": {
     "minimum": "12",
     "verified": "12"

@@ -9,7 +9,10 @@
 .cpr-ring-toast {
   position: fixed;
   top: 14px;
-  left: 50%;
+  /* Set from JS (positionToast() in ringing-toast.js) to center within the
+     safe area left of the sidebar, not the whole window — this default is
+     just a sane pre-layout fallback. */
+  left: var(--cpr-ring-left, 50%);
   transform: translate(-50%, -18px);
   z-index: 160;
   display: flex;
