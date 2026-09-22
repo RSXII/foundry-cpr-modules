@@ -63,11 +63,93 @@
   font-style: italic;
 }
 
+.cqi-roles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 .cqi-role {
   font-size: 0.75rem;
-  color: var(--cprt-cyan, #3ee6ff);
+  color: var(--cprt-text-dim, #a88a97);
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+/* The character's currently-active role (system.roleInfo.activeRole) reads
+   in the card's cyan accent; any other role they hold is listed too, just
+   dimmer — same information hierarchy as the "Readied" weapon tag, applied
+   to roles instead of gear. */
+.cqi-role-active {
+  color: var(--cprt-cyan, #3ee6ff);
+}
+
+/* ── Vitals ──────────────────────────────────────────────────────────────
+   Wound state, Humanity, armor SP. Deliberately reuses the card's existing
+   three-color vocabulary (hot/cyan/yellow) for severity rather than adding
+   a traffic-light red/orange/green scale that doesn't exist anywhere else
+   in this theme. Shown whenever the card itself is (same gate as gear),
+   not gated behind the per-token reveal flag the way identity is — "how
+   hurt are they" reads as observable at a glance, not something that needs
+   a GM's ID confirmation the way a name does. */
+.cqi-vitals {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.cqi-wound-tag {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 0.0625rem 0.375rem;
+  border: 0.0625rem solid currentColor;
+  color: var(--cprt-text-dim, #a88a97);
+}
+
+.cqi-wound-lightlyWounded {
+  color: var(--cprt-yellow, #e8c93f);
+}
+
+.cqi-wound-seriouslyWounded {
+  color: var(--cprt-hot, #ff2a5c);
+}
+
+.cqi-wound-mortallyWounded,
+.cqi-wound-dead {
+  color: var(--cprt-hot, #ff2a5c);
+  text-shadow: 0 0 0.375rem var(--cprt-hot-glow, #ff5c86);
+}
+
+.cqi-humanity {
+  font-size: 0.75rem;
+  color: var(--cprt-text-dim, #a88a97);
+  letter-spacing: 0.03em;
+}
+
+.cqi-armor-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.cqi-armor-chip {
+  font-size: 0.6875rem;
+  color: var(--cprt-cyan, #3ee6ff);
+  letter-spacing: 0.03em;
+}
+
+/* Critical Injuries reuse .cqi-gear-row/.cqi-gear-tag's layout wholesale —
+   this just recolors the tag from the gear list's yellow "Readied" accent
+   to the card's hot/danger accent, since a critical injury is bad news,
+   not a stat callout. */
+.cqi-crit-tag {
+  color: var(--cprt-hot, #ff2a5c);
+  border-color: var(--cprt-hot, #ff2a5c);
 }
 
 .cqi-notes {
@@ -142,4 +224,12 @@
   margin-top: 0.625rem;
   font-size: 0.8125rem;
   color: var(--cprt-text-mute, #6b4e5a);
+}
+
+/* Token HUD "Reveal Quick Info" toggle (token-hud.js) — a plain Foundry
+   .control-icon, just tinted to match this card's own accent so an active
+   reveal reads as "this module," not a generic core HUD button. */
+.cpr-quick-info-reveal.active i {
+  color: var(--cprt-hot, #ff2a5c);
+  text-shadow: 0 0 0.375rem var(--cprt-hot-glow, #ff5c86);
 }

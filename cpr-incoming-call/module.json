@@ -1,0 +1,40 @@
+{
+  "id": "cpr-incoming-call",
+  "title": "CPR Incoming Call",
+  "description": "Cyberpunk-style call handling for Foundry: a top-of-screen ringing toast with Answer/Reject, and a full connection card once answered, driven by the Fate City bridge's call.incoming/call.ended events.",
+  "version": "0.1.0",
+  "compatibility": {
+    "minimum": "12",
+    "verified": "12"
+  },
+  "authors": [
+    {
+      "name": "Ryan Schultz"
+    }
+  ],
+  "relationships": {
+    "systems": [
+      {
+        "id": "cyberpunk-red-core",
+        "type": "system",
+        "compatibility": {
+          "minimum": "0.92.0"
+        }
+      }
+    ],
+    "requires": [
+      {
+        "id": "fc99-bridge",
+        "type": "module",
+        "reason": "This module only reacts to the ChatMessage envelope fc99-bridge creates for each bridge event — it does nothing without it."
+      }
+    ]
+  },
+  "esmodules": [
+    "scripts/main.js"
+  ],
+  "styles": [
+    "styles/incoming-call.css",
+    "styles/ringing-toast.css"
+  ]
+}

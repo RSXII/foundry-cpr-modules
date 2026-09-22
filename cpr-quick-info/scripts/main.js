@@ -1,5 +1,6 @@
 import { MODULE_ID } from './data.js';
 import { registerQuickInfoHud, setEnabled, isEnabled } from './hud.js';
+import { registerRevealToggle } from './token-hud.js';
 
 // Public API for other modules/macros to drive this module's on/off state
 // (see hud.js — off by default, no UI of its own to flip it). Set during
@@ -17,4 +18,5 @@ Hooks.once('init', () => {
 
 Hooks.once('ready', () => {
   registerQuickInfoHud();
+  registerRevealToggle();
 });

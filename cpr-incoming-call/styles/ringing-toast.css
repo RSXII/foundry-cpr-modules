@@ -1,0 +1,141 @@
+/* CPR Incoming Call — ringing / in-call toast
+   The actual physical control for a call: top-of-screen, stays up for as
+   long as the call is ringing or connected (main.js's state machine is the
+   only thing that ever dismisses it). Unlike everything else in this
+   module (and unlike fc99-bridge's other toasts), this one is genuinely
+   interactive, so it does NOT set pointer-events: none on itself — only
+   the avatar/eyebrow/name area is inert, the button row is real UI. */
+
+.cpr-ring-toast {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translate(-50%, -18px);
+  z-index: 160;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px 14px;
+  background: rgba(10, 12, 18, 0.94);
+  border: 1px solid var(--cpr-call-accent-dim, rgba(255, 59, 59, 0.4));
+  border-radius: 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55), 0 0 18px rgba(255, 59, 59, 0.15);
+  opacity: 0;
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.cpr-ring-toast.cpr-ring-visible {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.cpr-ring-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cpr-ring-avatar-ring {
+  position: relative;
+  width: 46px;
+  height: 46px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cpr-ring-toast--ringing .cpr-ring-avatar-ring::before {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 59, 59, 0.55);
+  animation: cpr-ring-pulse 1.6s ease-out infinite;
+}
+
+@keyframes cpr-ring-pulse {
+  0% { transform: scale(0.85); opacity: 0.9; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+
+.cpr-ring-avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.cpr-ring-avatar--fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 59, 59, 0.14);
+  color: var(--cpr-call-accent, #ff3b3b);
+}
+
+.cpr-ring-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cpr-ring-eyebrow {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 10px;
+  letter-spacing: 1.8px;
+  text-transform: uppercase;
+  color: var(--cpr-call-accent, #ff3b3b);
+}
+
+.cpr-ring-toast--in-call .cpr-ring-eyebrow {
+  color: rgba(120, 230, 160, 0.9);
+}
+
+.cpr-ring-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: #f0ede4;
+}
+
+.cpr-ring-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.cpr-ring-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 16px;
+  border-radius: 999px;
+  border: none;
+  font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+  color: #fff;
+  cursor: pointer;
+  transition: transform 0.08s ease, filter 0.15s ease;
+}
+
+.cpr-ring-btn:hover {
+  filter: brightness(1.12);
+}
+
+.cpr-ring-btn:active {
+  transform: scale(0.95);
+}
+
+.cpr-ring-btn--answer {
+  background: #2fae5c;
+  box-shadow: 0 3px 12px rgba(47, 174, 92, 0.4);
+}
+
+.cpr-ring-btn--reject,
+.cpr-ring-btn--hangup {
+  background: #e03e3e;
+  box-shadow: 0 3px 12px rgba(224, 62, 62, 0.4);
+}

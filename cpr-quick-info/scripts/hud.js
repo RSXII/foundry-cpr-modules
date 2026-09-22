@@ -1,17 +1,20 @@
-import { MODULE_ID, isEnemyToken, buildQuickInfo } from './data.js';
+import { MODULE_ID, isEnemyToken, isRevealed, buildQuickInfo } from './data.js';
 import { getTokenScreenBox } from './geometry.js';
 
 const TEMPLATE_PATH = `modules/${MODULE_ID}/templates/quick-info.hbs`;
 const GAP_PX = 10;
 
 let cardEl = null;
-let currentTokenId = null;
+let hoveredTokenId = null;
 
 // Off by default — this module has no toggle of its own. It's meant to be
 // switched on by something else (cpr-twins-ai's Rogue AI Vision mode, a
 // macro, whatever) via the enable()/disable() API set on
 // game.modules.get('cpr-quick-info').api in main.js, and stay dark
-// otherwise rather than showing on every table by default.
+// otherwise rather than showing on every table by default. This is the
+// table-wide gate; a specific token can also earn visibility on its own
+// via isRevealed() (see token-hud.js's GM-only per-token toggle) regardless
+// of this switch — see isVisibleFor() below for how the two combine.
 let enabled = false;
 
 export function isEnabled() {
@@ -20,9 +23,18 @@ export function isEnabled() {
 
 export function setEnabled(value) {
   enabled = !!value;
-  // Flipping off mid-hover shouldn't leave a stranded card up until the
-  // mouse happens to leave the token.
-  if (!enabled) remove();
+  refreshHovered();
+}
+
+// A token is showable if it's non-friendly AND either the table-wide switch
+// is on, or this specific token has been individually revealed — an OR, not
+// an AND, so a GM can reveal one target (e.g. after a successful Perception
+// check they judge by eye — CPR's own skill roll cards don't compute
+// success/fail against a DV, so that judgment call is deliberately left to
+// the GM, not something this module tries to auto-resolve) without needing
+// cpr-twins-ai's whole vision-mode effect running table-wide first.
+function isVisibleFor(token) {
+  return isEnemyToken(token) && (enabled || isRevealed(token));
 }
 
 async function show(token) {
@@ -34,14 +46,12 @@ async function show(token) {
   wrapper.innerHTML = html.trim();
   cardEl = wrapper.firstElementChild;
   document.body.appendChild(cardEl);
-  currentTokenId = token.id;
   position(token);
 }
 
 function remove() {
   cardEl?.remove();
   cardEl = null;
-  currentTokenId = null;
 }
 
 /**
@@ -69,35 +79,46 @@ function position(token) {
   cardEl.style.top = `${top}px`;
 }
 
-function repositionCurrent() {
-  if (!cardEl || !currentTokenId) return;
-  const token = canvas.tokens?.get(currentTokenId);
-  if (token) position(token);
-  else remove();
+/**
+ * Re-derives whether a card should be showing for whatever's currently
+ * hovered, and shows/hides/repositions to match. The single place that
+ * reconciles "what's under the mouse" against "is it eligible right now" —
+ * called any time either side of that could have changed: a hover event, a
+ * token update (a drag, or its enemy/revealed eligibility flipping — e.g.
+ * the GM's per-token reveal toggle lands while a player is already
+ * hovering that exact token), a canvas pan, or the table-wide switch
+ * flipping.
+ */
+function refreshHovered() {
+  if (!hoveredTokenId) { remove(); return; }
+  const token = canvas.tokens?.get(hoveredTokenId);
+  if (!token || !isVisibleFor(token)) { remove(); return; }
+  if (cardEl) position(token);
+  else show(token);
 }
 
 export function registerQuickInfoHud() {
   Hooks.on('hoverToken', (token, hovered) => {
     if (!hovered) {
-      if (token.id === currentTokenId) remove();
+      if (token.id === hoveredTokenId) { hoveredTokenId = null; remove(); }
       return;
     }
-    if (!enabled) return;
-    if (!isEnemyToken(token)) return;
-    show(token);
+    hoveredTokenId = token.id;
+    refreshHovered();
   });
 
-  // Token moved (e.g. dragged by the GM) while its card is showing.
+  // Token updated while hovered — could be a drag (reposition), or its
+  // enemy/revealed eligibility changing (show/hide).
   Hooks.on('updateToken', (doc) => {
-    if (doc.id === currentTokenId) repositionCurrent();
+    if (doc.id === hoveredTokenId) refreshHovered();
   });
 
   // Canvas zoom/pan while a card is showing.
-  Hooks.on('canvasPan', repositionCurrent);
+  Hooks.on('canvasPan', refreshHovered);
 
-  // Scene change or token removal invalidates whatever's currently anchored.
-  Hooks.on('canvasReady', remove);
+  // Scene change or token removal invalidates whatever's currently hovered.
+  Hooks.on('canvasReady', () => { hoveredTokenId = null; remove(); });
   Hooks.on('deleteToken', (doc) => {
-    if (doc.id === currentTokenId) remove();
+    if (doc.id === hoveredTokenId) { hoveredTokenId = null; remove(); }
   });
 }

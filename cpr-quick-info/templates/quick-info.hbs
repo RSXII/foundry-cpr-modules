@@ -3,9 +3,43 @@
     <img class="cqi-portrait" src="{{img}}" alt="" />
     <div class="cqi-head-main">
       <div class="cqi-name{{#if nameHidden}} cqi-name-hidden{{/if}}">{{name}}</div>
-      {{#if role}}<div class="cqi-role">{{role}}</div>{{/if}}
+      {{#if roles.length}}
+        <div class="cqi-roles">
+          {{#each roles}}
+            <span class="cqi-role{{#if active}} cqi-role-active{{/if}}">{{name}}{{#if rank}} · Rank {{rank}}{{/if}}</span>
+          {{/each}}
+        </div>
+      {{/if}}
     </div>
   </div>
+
+  {{#if wound}}
+    <div class="cqi-vitals">
+      <span class="cqi-wound-tag cqi-wound-{{wound.key}}">{{wound.label}}</span>
+      {{#if humanity}}<span class="cqi-humanity">HUM {{humanity.value}}/{{humanity.max}}</span>{{/if}}
+    </div>
+  {{/if}}
+
+  {{#if armor.length}}
+    <div class="cqi-armor-row">
+      {{#each armor}}
+        <span class="cqi-armor-chip">{{label}} {{value}}/{{max}}</span>
+      {{/each}}
+    </div>
+  {{/if}}
+
+  {{#if criticalInjuries.length}}
+    <div class="cqi-section-label">Critical Injuries</div>
+    <div class="cqi-gear-list">
+      {{#each criticalInjuries}}
+        <div class="cqi-gear-row">
+          <img class="cqi-gear-icon" src="{{img}}" alt="" />
+          <span class="cqi-gear-name">{{name}}</span>
+          {{#if location}}<span class="cqi-gear-tag cqi-crit-tag">{{location}}</span>{{/if}}
+        </div>
+      {{/each}}
+    </div>
+  {{/if}}
 
   {{#if notes}}
     <div class="cqi-notes">{{notes}}</div>

@@ -1,0 +1,219 @@
+/* CPR Incoming Call
+   Cyberpunk-style connection card, docked to the bottom-right corner of the
+   canvas (clearing the chat sidebar and macro hotbar — see positionCard()
+   in call-card.js). Shown once a call is answered from the ringing-toast.js
+   toast (see main.js's state machine) — the actual answer/reject/hang-up
+   control lives on that toast, not here. Genre-contrast pop from
+   fate-city-1999's Operation Timer clean-bezel overlay (see fate-city-1999/
+   docs/state-overlay-design-system.md) — a call is a discrete, dramatic
+   event, not an ambient whole-scene state. Reuses the red fc99-bridge's own
+   call toast already established, rather than inventing a new color for
+   the same event type. Purely cosmetic DOM — pointer-events: none
+   throughout, so it never blocks canvas/chat interaction underneath. */
+
+:root {
+  --cpr-call-accent: #ff3b3b;
+  --cpr-call-accent-dim: rgba(255, 59, 59, 0.4);
+}
+
+.cpr-call-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 150;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  /* Set from JS (positionCard()) to clear the sidebar/hotbar; these are
+     just sane defaults before the first layout pass. */
+  padding: 0 var(--cpr-call-right, 340px) var(--cpr-call-bottom, 110px) 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.cpr-call-overlay.cpr-call-visible {
+  opacity: 1;
+}
+
+.cpr-call-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transform: translateX(28px) scale(0.96);
+  transition: transform 0.45s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.cpr-call-overlay.cpr-call-visible .cpr-call-card {
+  transform: translateX(0) scale(1);
+}
+
+.cpr-call-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 11px;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: var(--cpr-call-accent);
+  margin-bottom: 10px;
+  text-shadow: 0 0 8px var(--cpr-call-accent-dim);
+}
+
+.cpr-call-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--cpr-call-accent);
+  flex-shrink: 0;
+  animation: cpr-call-blink 1.1s ease-in-out infinite;
+}
+
+@keyframes cpr-call-blink {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+
+/* ── Card frame ────────────────────────────────────────────────────────── */
+.cpr-call-frame {
+  position: relative;
+  filter: drop-shadow(0 0 22px rgba(255, 59, 59, 0.35)) drop-shadow(0 10px 30px rgba(0, 0, 0, 0.6));
+}
+
+.cpr-call-portrait {
+  position: relative;
+  overflow: hidden;
+  background: #1a0a0a;
+}
+
+.cpr-call-portrait-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  filter: saturate(1.05) contrast(1.05);
+}
+
+.cpr-call-portrait-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cpr-call-accent-dim);
+  background:
+    repeating-linear-gradient(135deg, rgba(255, 59, 59, 0.05) 0 2px, transparent 2px 8px),
+    #1a0a0a;
+}
+
+/* Continuous faint scanline sweep, reinforcing "live transmission" for as
+   long as the card is up. */
+.cpr-call-scan {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0px,
+    transparent 3px,
+    rgba(255, 59, 59, 0.06) 3px,
+    rgba(255, 59, 59, 0.06) 4px
+  );
+}
+
+.cpr-call-scan::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 40%;
+  background: linear-gradient(to bottom, transparent, rgba(255, 200, 200, 0.08), transparent);
+  animation: cpr-call-sweep 3.2s linear infinite;
+}
+
+@keyframes cpr-call-sweep {
+  0% { top: -40%; }
+  100% { top: 100%; }
+}
+
+/* One-shot glitch-in burst on entrance: hard-stepped RGB-tinted bands that
+   flicker briefly then get switched off entirely (see main.js,
+   `.cpr-call-glitch--done`) rather than looping — a looping glitch over a
+   readable name card reads as broken, not stylish. */
+.cpr-call-glitch {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  background:
+    repeating-linear-gradient(to bottom, rgba(255, 40, 40, 0.5) 0 3px, transparent 3px 9px),
+    repeating-linear-gradient(to bottom, rgba(80, 220, 220, 0.35) 0 2px, transparent 2px 11px);
+  background-position: 0 0, 0 4px;
+  animation: cpr-call-glitch-burst 0.45s steps(5) 1;
+  transition: opacity 0.15s ease;
+}
+
+.cpr-call-glitch--done {
+  opacity: 0;
+}
+
+@keyframes cpr-call-glitch-burst {
+  0%   { transform: translate(0, 0); opacity: 0.9; }
+  20%  { transform: translate(-4px, 0); opacity: 0.7; }
+  40%  { transform: translate(3px, 0); opacity: 0.8; }
+  60%  { transform: translate(-2px, 0); opacity: 0.5; }
+  80%  { transform: translate(2px, 0); opacity: 0.6; }
+  100% { transform: translate(0, 0); opacity: 0; }
+}
+
+.cpr-call-frame-svg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.cpr-call-frame-outline {
+  fill: none;
+  stroke: var(--cpr-call-accent);
+  stroke-width: 1.5;
+  opacity: 0.9;
+}
+
+.cpr-call-tick {
+  stroke: var(--cpr-call-accent);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  opacity: 0.85;
+}
+
+/* ── Identity text ─────────────────────────────────────────────────────── */
+.cpr-call-name {
+  margin-top: 18px;
+  font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: #f5efe8;
+  text-align: center;
+  text-shadow: 0 0 14px var(--cpr-call-accent-dim);
+}
+
+.cpr-call-subtitle {
+  margin-top: 4px;
+  font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif;
+  font-size: 13px;
+  color: rgba(245, 239, 232, 0.55);
+  letter-spacing: 0.5px;
+  text-align: center;
+}
+
+.cpr-call-label {
+  margin-top: 12px;
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 10px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--cpr-call-accent-dim);
+  animation: cpr-call-blink 1.6s ease-in-out infinite;
+}
