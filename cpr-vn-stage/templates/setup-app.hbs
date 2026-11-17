@@ -1,0 +1,71 @@
+<div class="cpr-vn-setup">
+  <div class="cpr-vn-setup-header">
+    <img class="cpr-vn-setup-avatar" src="{{actor.img}}" alt="" />
+    <div>
+      <div class="cpr-vn-setup-title">{{actor.name}}</div>
+      <div class="cpr-vn-setup-sub">VN stand configuration</div>
+    </div>
+  </div>
+
+  <div class="cpr-vn-toggle-row">
+    <div class="cpr-vn-toggle-label">Name tag on stage</div>
+    <div class="cpr-vn-role-opts">
+      <button type="button" class="cpr-vn-role-opt {{#if showName}}is-active{{/if}}" data-nametoggle="show">Visible</button>
+      <button type="button" class="cpr-vn-role-opt {{#unless showName}}is-active{{/unless}}" data-nametoggle="hide">Hidden</button>
+    </div>
+    <div class="cpr-vn-toggle-hint">
+      {{#if showName}}
+        Players see {{actor.name}}'s name under the stand art. You can also click the tag on stage to hide it.
+      {{else}}
+        Players see the art only &mdash; no name shown. On stage you'll still see the tag, dimmed &mdash; click it there to show it to players.
+      {{/if}}
+    </div>
+  </div>
+
+  {{#if defaultEmotion}}
+  <div class="cpr-vn-callout">
+    <i class="fas fa-star"></i>
+    <div>Default stand: <b>{{defaultEmotion.label}}</b> &mdash; this loads first the moment {{actor.name}} is added to the scene.</div>
+  </div>
+  {{/if}}
+
+  <div class="cpr-vn-section-label">Emotions</div>
+  <div class="cpr-vn-emotion-list">
+    {{#each emotions}}
+    <div class="cpr-vn-emotion-row {{#if this.isDefault}}is-default{{/if}}" data-emrow="{{this.id}}">
+      <div class="cpr-vn-emotion-thumb">
+        {{#if this.img}}
+          <img src="{{this.img}}" alt="" />
+        {{else}}
+          <i class="fas fa-user-astronaut"></i>
+        {{/if}}
+      </div>
+      <input class="cpr-vn-emotion-name" type="text" data-emname="{{this.id}}" value="{{this.label}}" />
+      <button type="button" class="cpr-vn-icon-btn {{#if this.isDefault}}is-on{{/if}}" data-emdefault="{{this.id}}"
+        title="{{#if this.isDefault}}This is the default stand{{else}}Set as default stand{{/if}}">
+        <i class="fas fa-star"></i>
+      </button>
+      <button type="button" class="cpr-vn-icon-btn" data-emdelete="{{this.id}}" {{#unless this.canDelete}}disabled{{/unless}}
+        title="{{#if this.isDefault}}Set another default first{{else}}Remove emotion{{/if}}">
+        <i class="fas fa-trash"></i>
+      </button>
+    </div>
+    {{/each}}
+  </div>
+
+  <div class="cpr-vn-dropzone" tabindex="0">
+    <div class="cpr-vn-dropzone-icon"><i class="fas fa-upload"></i></div>
+    <div class="cpr-vn-dropzone-text">
+      <b>Drop PNGs here</b>, or click to browse &mdash; select several at once. You'll get one screen to
+      label and match every image to an expression before anything is saved.
+    </div>
+  </div>
+  <input type="file" class="cpr-vn-file-input" accept="image/*" multiple hidden />
+
+  <button type="button" class="cpr-vn-add-emotion-btn"><i class="fas fa-plus"></i> Add a blank emotion manually</button>
+
+  <div class="cpr-vn-note">
+    Each emotion is its own stand image, scoped to {{actor.name}} only. The expression picker on stage pulls
+    straight from this list.
+  </div>
+</div>
